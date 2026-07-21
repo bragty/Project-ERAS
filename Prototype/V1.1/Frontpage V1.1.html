@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BENE Plattform - Frontpage V1.1</title>
+<style>
+  :root{
+    --paper:#F4F8FB;
+    --card:#FFFFFF;
+    --ink:#16262A;
+    --ink-soft:#4E6165;
+    --blue:#0098d7;
+    --blue-dark:#0077AA;
+    --blue-pale:#E5F6FC;
+    --green:#00B050;
+    --line:#000000;
+    --shadow:0 1px 2px rgba(16,38,42,0.04), 0 10px 28px rgba(16,38,42,0.08);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0; padding:0;}
+  body{
+    min-height:100vh;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:Arial, Helvetica, sans-serif;
+    font-size:15px;
+    line-height:1.5;
+  }
+  .hero{
+    background:var(--blue);
+    color:#fff;
+    padding:30px 0 34px;
+  }
+  .wrap{max-width:980px; margin:0 auto; padding:0 24px;}
+  .brand-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:24px;
+  }
+  .eyebrow{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:11.5px;
+    font-weight:700;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    opacity:.92;
+  }
+  .dot{
+    width:7px;
+    height:7px;
+    border-radius:50%;
+    background:#8FE0CE;
+    box-shadow:0 0 0 3px rgba(143,224,206,0.25);
+  }
+  h1{
+    margin:8px 0 4px;
+    font-size:34px;
+    line-height:1.12;
+  }
+  .subline{margin:0; font-size:14px;}
+  .logo-card{
+    background:#fff;
+    border-radius:8px;
+    padding:14px 18px;
+    box-shadow:0 8px 24px rgba(0,72,104,0.14);
+  }
+  .logo-card img{height:92px; width:auto; display:block;}
+  .main{
+    padding:26px 0 46px;
+  }
+  .selection-card{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:22px;
+    box-shadow:var(--shadow);
+  }
+  .selection-top{
+    display:flex;
+    justify-content:space-between;
+    gap:20px;
+    align-items:flex-start;
+    margin-bottom:20px;
+  }
+  .selection-top h2{margin:0; color:var(--blue-dark); font-size:22px;}
+  .selection-top p{margin:4px 0 0; color:var(--ink-soft); font-size:13.5px;}
+  .status-pill{
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    border:1px solid var(--line);
+    border-radius:100px;
+    padding:6px 11px;
+    font-size:12px;
+    color:var(--ink-soft);
+    white-space:nowrap;
+  }
+  .status-pill::before{
+    content:"";
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:var(--green);
+  }
+  .actions{
+    display:grid;
+    grid-template-columns:minmax(260px, 1fr) auto;
+    gap:12px;
+    align-items:end;
+  }
+  .field{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    color:var(--ink-soft);
+    font-size:12px;
+  }
+  .field span{
+    color:var(--blue-dark);
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+  }
+  select,input{
+    width:100%;
+    border:1px solid var(--line);
+    border-radius:8px;
+    background:#fff;
+    color:var(--ink);
+    font-family:Arial, Helvetica, sans-serif;
+    font-size:13px;
+    padding:10px 11px;
+  }
+  select:focus,input:focus{
+    outline:2px solid var(--blue);
+    outline-offset:1px;
+  }
+  .btn{
+    border:1px solid var(--line);
+    border-radius:8px;
+    background:#fff;
+    color:var(--ink);
+    cursor:pointer;
+    font-family:Arial, Helvetica, sans-serif;
+    font-size:13px;
+    font-weight:700;
+    padding:10px 14px;
+  }
+  .btn:hover{background:#F3F8FA;}
+  .btn.primary{
+    background:var(--blue);
+    border-color:var(--blue-dark);
+    color:#fff;
+    white-space:nowrap;
+  }
+  .btn.primary:hover{background:var(--blue-dark);}
+  .patient-preview{
+    margin-top:18px;
+    border-top:1px solid var(--line);
+    padding-top:16px;
+    display:grid;
+    grid-template-columns:repeat(4, minmax(0, 1fr));
+    gap:10px;
+  }
+  .preview-box{
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px;
+    background:#fff;
+    min-height:68px;
+  }
+  .preview-box span{
+    display:block;
+    color:var(--ink-soft);
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+  }
+  .preview-box strong{
+    display:block;
+    margin-top:4px;
+    font-size:13px;
+    word-break:break-word;
+  }
+  .dashboard-card{
+    margin-top:18px;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:18px 22px 20px;
+    box-shadow:var(--shadow);
+  }
+  .dashboard-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:16px;
+    margin-bottom:14px;
+  }
+  .dashboard-head h2{margin:0; color:var(--blue-dark); font-size:20px;}
+  .dashboard-head p{margin:4px 0 0; color:var(--ink-soft); font-size:13.5px;}
+  .dashboard-count{
+    border:1px solid var(--line);
+    border-radius:100px;
+    padding:6px 11px;
+    font-size:12px;
+    color:var(--ink-soft);
+    white-space:nowrap;
+  }
+  .patient-table{display:flex; flex-direction:column; border:1px solid var(--line); border-radius:8px; overflow:hidden;}
+  .patient-row{
+    display:grid;
+    grid-template-columns:1.25fr .9fr .9fr 1.45fr 1.1fr 34px;
+    gap:12px;
+    align-items:center;
+    min-height:54px;
+    padding:10px 12px;
+    border-top:1px solid var(--line);
+    background:#fff;
+  }
+  .patient-row:first-child{border-top:none;}
+  .patient-row.header{
+    min-height:auto;
+    background:var(--blue-pale);
+    color:var(--blue-dark);
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+  }
+  .patient-row strong{display:block; font-size:13px;}
+  .patient-row small{display:block; color:var(--ink-soft); font-size:12px;}
+  .progress-cell{display:flex; align-items:center; gap:9px;}
+  .progress-track{
+    flex:1;
+    height:10px;
+    border:1px solid var(--line);
+    border-radius:100px;
+    overflow:hidden;
+    background:#fff;
+  }
+  .progress-fill{height:100%; background:var(--green);}
+  .progress-value{width:38px; text-align:right; font-size:12px; color:var(--ink-soft);}
+  .remove-patient{
+    width:30px;
+    height:30px;
+    border:1px solid var(--line);
+    border-radius:7px;
+    background:#fff;
+    cursor:pointer;
+    color:#B23A3A;
+    font-size:18px;
+    line-height:1;
+  }
+  .remove-patient:hover{background:#FDF1F1;}
+  .modal-backdrop{
+    position:fixed;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    background:rgba(0,0,0,0.38);
+    z-index:50;
+  }
+  .modal-backdrop.open{display:flex;}
+  .modal{
+    width:min(760px, 100%);
+    max-height:90vh;
+    overflow:auto;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:10px;
+    box-shadow:0 18px 45px rgba(0,0,0,0.22);
+  }
+  .modal-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    padding:18px 20px;
+    border-bottom:1px solid var(--line);
+  }
+  .modal-head h2{margin:0; color:var(--blue-dark); font-size:20px;}
+  .modal-close{
+    width:34px;
+    height:34px;
+    border:1px solid var(--line);
+    border-radius:7px;
+    background:#fff;
+    cursor:pointer;
+    font-size:20px;
+    line-height:1;
+  }
+  .modal-body{padding:18px 20px 20px;}
+  .modal-grid{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:12px 14px;
+  }
+  .modal-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    margin-top:18px;
+  }
+  @media (max-width:720px){
+    .brand-row,.selection-top{flex-direction:column;}
+    .logo-card img{height:72px;}
+    .actions,.modal-grid,.patient-preview{grid-template-columns:1fr;}
+    .dashboard-head{flex-direction:column;}
+    .patient-row{grid-template-columns:1fr; gap:4px;}
+    .patient-row.header{display:none;}
+    .remove-patient{width:100%;}
+    .modal-actions{flex-direction:column-reverse;}
+    .modal-actions .btn{width:100%;}
+  }
+</style>
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <div class="brand-row">
+        <div>
+          <div class="eyebrow"><span class="dot"></span> KSW · Urologie · Perioperativer Pfad</div>
+          <h1>BENE Plattform</h1>
+          <p class="subline">Patientenauswahl und Erfassung für den perioperativen Zystektomie-Pfad.</p>
+        </div>
+        <div class="logo-card">
+          <img src="../../Media/KSW Logo.png" alt="KSW Logo">
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="wrap">
+      <section class="selection-card">
+        <div class="selection-top">
+          <div>
+            <h2>Patientenübersicht</h2>
+            <p>Patient auswählen oder neuen Patienten erfassen.</p>
+          </div>
+          <div class="status-pill">BENE aktiv</div>
+        </div>
+
+        <div class="actions">
+          <label class="field">
+            <span>Patientenauswahl</span>
+            <select id="patientSelect">
+              <option value="">Patient*in auswählen</option>
+            </select>
+          </label>
+          <button type="button" class="btn primary" id="newPatientBtn">Neu Patient erfassen</button>
+        </div>
+
+        <div class="patient-preview" aria-live="polite">
+          <div class="preview-box"><span>Patient*in</span><strong id="previewName">-</strong></div>
+          <div class="preview-box"><span>Fallnummer</span><strong id="previewCase">-</strong></div>
+          <div class="preview-box"><span>OP Datum</span><strong id="previewOpDate">-</strong></div>
+          <div class="preview-box"><span>Eingriffsart</span><strong id="previewProcedure">-</strong></div>
+        </div>
+      </section>
+
+      <section class="dashboard-card">
+        <div class="dashboard-head">
+          <div>
+            <h2>Patienten Dashboard</h2>
+            <p>Aktuelle Patientinnen und Patienten im BENE-Pfad.</p>
+          </div>
+          <div class="dashboard-count" id="dashboardCount">0 Patienten</div>
+        </div>
+        <div class="patient-table" id="patientDashboard"></div>
+      </section>
+    </div>
+  </main>
+
+  <div class="modal-backdrop" id="patientModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="patientModalTitle">
+      <div class="modal-head">
+        <h2 id="patientModalTitle">Patient erfassen</h2>
+        <button type="button" class="modal-close" id="closePatientModal" aria-label="Fenster schliessen">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-grid">
+          <label class="field"><span>BENE-Nurse</span><input id="newBeneNurse" type="text"></label>
+          <label class="field"><span>BENE-Nurse Stellvertretung</span><input id="newBeneDeputy" type="text"></label>
+          <label class="field"><span>Operateur</span><input id="newSurgeon" type="text"></label>
+          <label class="field"><span>Patient*in Name</span><input id="newPatientName" type="text"></label>
+          <label class="field"><span>Patient*in Nummer</span><input id="newPatientNumber" type="text"></label>
+          <label class="field"><span>Patient*in Fallnummer</span><input id="newCaseNumber" type="text"></label>
+          <label class="field"><span>OP Datum falls vorhanden</span><input id="newOpDate" type="date"></label>
+          <label class="field"><span>Eingriffsart</span>
+            <select id="newProcedure">
+              <option value="">Bitte wählen</option>
+              <option>Radikale Zystektomie mit Ileum-Conduit</option>
+              <option>Radikale Zystektomie mit Neoblase</option>
+              <option>Funktionelle Zystektomie</option>
+              <option>Andere Eingriffsart</option>
+            </select>
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn" id="cancelPatientModal">Abbrechen</button>
+          <button type="button" class="btn primary" id="savePatient">Patient übernehmen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const patients = [
+  {beneNurse:"Corina Frei", beneDeputy:"Jessica Ambros", surgeon:"Dr. Meier", name:"Muster Anna", patientNumber:"P-10021", caseNumber:"F-78342", opDate:"2026-08-14", procedure:"Radikale Zystektomie mit Ileum-Conduit", progress:82},
+  {beneNurse:"Corina Frei", beneDeputy:"Jessica Ambros", surgeon:"Dr. Keller", name:"Beispiel Peter", patientNumber:"P-10022", caseNumber:"F-78343", opDate:"2026-08-21", procedure:"Radikale Zystektomie mit Neoblase", progress:48},
+  {beneNurse:"Corina Frei", beneDeputy:"Jessica Ambros", surgeon:"Dr. Schmid", name:"Test Maria", patientNumber:"P-10023", caseNumber:"F-78344", opDate:"2026-09-02", procedure:"Funktionelle Zystektomie", progress:65},
+  {beneNurse:"Corina Frei", beneDeputy:"Jessica Ambros", surgeon:"Dr. Weber", name:"Demo Lukas", patientNumber:"P-10024", caseNumber:"F-78345", opDate:"", procedure:"Radikale Zystektomie mit Ileum-Conduit", progress:24},
+  {beneNurse:"Corina Frei", beneDeputy:"Jessica Ambros", surgeon:"Dr. Huber", name:"Patientin Eva", patientNumber:"P-10025", caseNumber:"F-78346", opDate:"2026-09-18", procedure:"Radikale Zystektomie mit Neoblase", progress:91},
+  {beneNurse:"Corina Frei", beneDeputy:"Jessica Ambros", surgeon:"Dr. Frei", name:"Patient Max", patientNumber:"P-10026", caseNumber:"F-78347", opDate:"2026-10-03", procedure:"Andere Eingriffsart", progress:37}
+];
+
+function esc(value){
+  return String(value == null ? "" : value).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function patientLabel(patient){
+  return [patient.name || "Unbenannte/r Patient*in", patient.caseNumber ? `Fall ${patient.caseNumber}` : "", patient.procedure || ""].filter(Boolean).join(" · ");
+}
+
+function renderPatients(){
+  const select = document.getElementById("patientSelect");
+  select.innerHTML = '<option value="">Patient*in auswählen</option>' + patients.map((patient, idx) => `<option value="${idx}">${esc(patientLabel(patient))}</option>`).join("");
+  renderDashboard();
+}
+
+function updatePreview(patient){
+  document.getElementById("previewName").textContent = patient && patient.name ? patient.name : "-";
+  document.getElementById("previewCase").textContent = patient && patient.caseNumber ? patient.caseNumber : "-";
+  document.getElementById("previewOpDate").textContent = patient && patient.opDate ? patient.opDate : "-";
+  document.getElementById("previewProcedure").textContent = patient && patient.procedure ? patient.procedure : "-";
+}
+
+function renderDashboard(){
+  const dashboard = document.getElementById("patientDashboard");
+  const count = document.getElementById("dashboardCount");
+  count.textContent = patients.length === 1 ? "1 Patient" : `${patients.length} Patienten`;
+  dashboard.innerHTML = `
+    <div class="patient-row header">
+      <div>Patient*in</div>
+      <div>Fallnummer</div>
+      <div>OP Datum</div>
+      <div>Eingriffsart</div>
+      <div>Progression</div>
+      <div></div>
+    </div>
+    ${patients.map((patient, idx) => `
+      <div class="patient-row">
+        <div><strong>${esc(patient.name || "-")}</strong><small>${esc(patient.patientNumber || "")}</small></div>
+        <div>${esc(patient.caseNumber || "-")}</div>
+        <div>${esc(patient.opDate || "offen")}</div>
+        <div>${esc(patient.procedure || "-")}</div>
+        <div class="progress-cell">
+          <div class="progress-track"><div class="progress-fill" style="width:${Number(patient.progress || 0)}%"></div></div>
+          <span class="progress-value">${Number(patient.progress || 0)}%</span>
+        </div>
+        <button type="button" class="remove-patient" data-remove-patient="${idx}" aria-label="Patient entfernen">×</button>
+      </div>
+    `).join("")}
+  `;
+}
+
+function openModal(){
+  const modal = document.getElementById("patientModal");
+  modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
+  document.getElementById("newPatientName").focus();
+}
+
+function closeModal(){
+  const modal = document.getElementById("patientModal");
+  modal.classList.remove("open");
+  modal.setAttribute("aria-hidden", "true");
+}
+
+function clearModal(){
+  ["newBeneNurse","newBeneDeputy","newSurgeon","newPatientName","newPatientNumber","newCaseNumber","newOpDate","newProcedure"].forEach(id => {
+    document.getElementById(id).value = "";
+  });
+}
+
+function savePatient(){
+  const patient = {
+    beneNurse: document.getElementById("newBeneNurse").value.trim(),
+    beneDeputy: document.getElementById("newBeneDeputy").value.trim(),
+    surgeon: document.getElementById("newSurgeon").value.trim(),
+    name: document.getElementById("newPatientName").value.trim(),
+    patientNumber: document.getElementById("newPatientNumber").value.trim(),
+    caseNumber: document.getElementById("newCaseNumber").value.trim(),
+    opDate: document.getElementById("newOpDate").value,
+    procedure: document.getElementById("newProcedure").value
+  };
+  patient.progress = 0;
+  patients.push(patient);
+  renderPatients();
+  document.getElementById("patientSelect").value = String(patients.length - 1);
+  updatePreview(patient);
+  clearModal();
+  closeModal();
+}
+
+document.getElementById("newPatientBtn").addEventListener("click", () => {
+  clearModal();
+  openModal();
+});
+document.getElementById("closePatientModal").addEventListener("click", closeModal);
+document.getElementById("cancelPatientModal").addEventListener("click", closeModal);
+document.getElementById("patientModal").addEventListener("click", event => {
+  if (event.target.id === "patientModal") closeModal();
+});
+document.getElementById("savePatient").addEventListener("click", savePatient);
+document.getElementById("patientSelect").addEventListener("change", event => {
+  const patient = patients[parseInt(event.target.value, 10)];
+  updatePreview(patient);
+});
+document.getElementById("patientDashboard").addEventListener("click", event => {
+  const remove = event.target.closest("[data-remove-patient]");
+  if (!remove) return;
+  const idx = parseInt(remove.dataset.removePatient, 10);
+  patients.splice(idx, 1);
+  renderPatients();
+  document.getElementById("patientSelect").value = "";
+  updatePreview(null);
+});
+
+renderPatients();
+</script>
+</body>
+</html>
