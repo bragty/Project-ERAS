@@ -1,0 +1,35 @@
+{% load static %}
+<div class="chart-strip">
+  <div class="wrap">
+    <a class="back-to-app" href="{% url 'eras:home' %}">Zur Patientenübersicht</a>
+    <div class="brand-row">
+      <div class="brand-copy">
+        <div class="eyebrow"><span class="dot"></span> KSW · Urologie · Perioperativer Pfad</div>
+        <h1>BENE Plattform</h1>
+        <div class="subline">Digitale Checkliste — präoperative Sprechstunde &amp; Gesamtpfad prä-/intra-/postoperativ</div>
+        <div class="contact-pill">☎ Ansprechperson BENE-Nurse: Corina Frei · Stv. Jessica Ambros</div>
+      </div>
+      <img class="ksw-logo" src="{% static 'eras/images/KSW Logo.png' %}" alt="KSW Logo">
+    </div>
+
+    <div class="patient-row">
+      <input id="pname" type="text" placeholder="Patient*in (Name / Fallnummer)">
+      <input id="opdate" type="text" placeholder="OP-Datum (dd.mm.yyyy)">
+    </div>
+
+    <div class="progress-grid">
+      <div class="vitals">
+        <div class="vitals-top">
+          <span class="vitals-label">Prä-OP Checkliste</span>
+          <span class="vitals-pct" id="preopPct">0%</span>
+        </div>
+        <div class="segbar" id="preopSegbar"></div>
+      </div>
+      <div class="vitals">
+        <div class="vitals-top">
+          <span class="vitals-label">Gesamtpfad</span>
+          <span class="vitals-pct" id="pathPct">0%</span>
+        </div>
+        <div class="segbar" id="pathSegbar"></div>
+      </div>
+    </div>

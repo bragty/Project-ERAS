@@ -1,0 +1,45 @@
+{% extends "eras/base.html" %}
+{% load static %}
+
+{% block extra_css %}<link rel="stylesheet" href="{% static 'eras/css/checklist.css' %}">{% endblock %}
+
+{% block header %}{% include "eras/includes/checklist_header.html" %}{% endblock %}
+
+{% block content %}
+</div>
+</div>
+
+<aside class="pathway-rail" aria-label="Checklisten-Sprünge">
+  <div class="pathway-rail-title">Laufbahn</div>
+  <button type="button" data-rail-tab="t1" data-rail-target="#pname">Patient</button>
+  <button type="button" data-rail-tab="t1" data-rail-target='[data-id="t1:vitalparameter"]'>Vitalparameter</button>
+  <button type="button" data-rail-tab="t1" data-rail-target='[data-id="t1:fb-g8"]'>Fragebögen</button>
+  <button type="button" data-rail-tab="t1" data-rail-target='[data-id="t1:laborwerte"]'>Labor</button>
+  <button type="button" data-rail-tab="t1" data-rail-target='[data-id="t1:anaesthesie"]'>Zuweisungen</button>
+  <button type="button" data-rail-tab="t2" data-rail-target='[data-role="p-uro"]'>Präoperativ</button>
+  <button type="button" data-rail-tab="t2" data-rail-target='[data-role="i-uro"]'>Intraoperativ</button>
+  <button type="button" data-rail-tab="t2" data-rail-target='[data-role="s-pflege"]'>Stationär</button>
+  <button type="button" data-rail-tab="t2" data-rail-target='[data-role="a-aerztlich"]'>Ambulant</button>
+</aside>
+
+<div class="wrap">
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="t1">Prä-OP Checkliste (BENE-Sprechstunde)</button>
+    <button class="tab-btn" data-tab="t2">Gesamtpfad prä–/intra–/postoperativ</button>
+  </div>
+
+  <div class="tab-panel active" id="panel-t1">
+    <p class="section-note">Massnahmen, die ca. <strong>2–3 Monate vor der Operation</strong> in der BENE-Sprechstunde eingeleitet werden müssen. Kästchen antippen zum Abhaken, Werte direkt in die Felder eintragen.</p>
+    <div id="items-t1"></div>
+  </div>
+
+  <div class="tab-panel" id="panel-t2">
+    <p class="section-note">Synthese aller Massnahmen entlang des Behandlungspfads — geordnet nach Phase und Berufsgruppe.</p>
+    <div id="phases-t2"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block footer %}{% include "eras/includes/checklist_footer.html" %}{% endblock %}
+
+{% block extra_js %}<script src="{% static 'eras/js/checklist.js' %}" defer></script>{% endblock %}

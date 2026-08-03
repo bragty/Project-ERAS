@@ -1,0 +1,32 @@
+<div class="modal-backdrop" id="patientModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="patientModalTitle">
+      <div class="modal-head">
+        <h2 id="patientModalTitle">Patient erfassen</h2>
+        <button type="button" class="modal-close" id="closePatientModal" aria-label="Fenster schliessen">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-grid">
+          <label class="field"><span>BENE-Nurse</span><input id="newBeneNurse" type="text"></label>
+          <label class="field"><span>BENE-Nurse Stellvertretung</span><input id="newBeneDeputy" type="text"></label>
+          <label class="field"><span>Operateur</span><input id="newSurgeon" type="text"></label>
+          <label class="field"><span>Patient*in Name</span><input id="newPatientName" type="text"></label>
+          <label class="field"><span>Patient*in Nummer</span><input id="newPatientNumber" type="text"></label>
+          <label class="field"><span>Patient*in Fallnummer</span><input id="newCaseNumber" type="text"></label>
+          <label class="field"><span>OP Datum falls vorhanden</span><input id="newOpDate" type="date"></label>
+          <label class="field"><span>Eingriffsart</span>
+            <select id="newProcedure">
+              <option value="">Bitte wählen</option>
+              <option>Radikale Zystektomie mit Ileum-Conduit</option>
+              <option>Radikale Zystektomie mit Neoblase</option>
+              <option>Funktionelle Zystektomie</option>
+              <option>Andere Eingriffsart</option>
+            </select>
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn" id="cancelPatientModal">Abbrechen</button>
+          <button type="button" class="btn primary" id="savePatient">Patient übernehmen</button>
+        </div>
+      </div>
+    </div>
+  </div>

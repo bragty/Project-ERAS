@@ -1,0 +1,19 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}{{ page_title|default:"BENE Plattform" }}{% endblock %}</title>
+  <link rel="icon" href="{% static 'eras/images/KSW Logo.png' %}">
+  <link rel="stylesheet" href="{% static 'eras/css/base.css' %}">
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+  {% block header %}{% endblock %}
+  {% block content %}{% endblock %}
+  {% block footer %}{% endblock %}
+  <script src="{% static 'eras/js/main.js' %}" defer></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

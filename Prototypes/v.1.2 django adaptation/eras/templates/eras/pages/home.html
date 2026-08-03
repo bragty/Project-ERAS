@@ -1,0 +1,42 @@
+{% extends "eras/base.html" %}
+{% load static %}
+
+{% block extra_css %}<link rel="stylesheet" href="{% static 'eras/css/frontpage.css' %}">{% endblock %}
+
+{% block header %}{% include "eras/includes/frontpage_header.html" %}{% endblock %}
+
+{% block content %}
+<main class="main">
+    <div class="wrap">
+      <section class="selection-card">
+        <div class="selection-top">
+          <div>
+            <h2>Patientenübersicht</h2>
+            <p>Patient auswählen oder neuen Patienten erfassen.</p>
+          </div>
+          <div class="status-pill">BENE aktiv</div>
+        </div>
+
+        <div class="actions" data-checklist-url="{% url 'eras:checklist' %}">
+          <label class="field">
+            <span>Patientenauswahl</span>
+            <input id="patientSearch" type="search" placeholder="Name, Fallnummer, Patientennummer oder Eingriff suchen" autocomplete="off">
+          </label>
+          <button type="button" class="btn primary" id="newPatientBtn">Neu Patient erfassen</button>
+        </div>
+
+        <div class="search-results" id="patientSearchResults" aria-live="polite"></div>
+
+        <div class="patient-preview" aria-live="polite">
+          <div class="preview-box"><span>Patient*in</span><strong id="previewName">-</strong></div>
+          <div class="preview-box"><span>Fallnummer</span><strong id="previewCase">-</strong></div>
+          <div class="preview-box"><span>OP Datum</span><strong id="previewOpDate">-</strong></div>
+          <div class="preview-box"><span>Eingriffsart</span><strong id="previewProcedure">-</strong></div>
+        </div>
+      </section>
+    </div>
+  </main>
+{% include "eras/includes/patient_modal.html" %}
+{% endblock %}
+
+{% block extra_js %}<script src="{% static 'eras/js/frontpage.js' %}" defer></script>{% endblock %}
