@@ -1,2 +1,0 @@
-streamlit>=1.61
-Django>=5.0,<6.0
