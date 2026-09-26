@@ -368,7 +368,7 @@ function preopItemIds(){
 
 function pathItemIds(){
   const ids = [];
-  PHASES.forEach(ph => ph.roles.forEach(r => r.items.forEach((it,idx) => ids.push("t2:"+r.id+":"+idx))));
+  PHASES.forEach(ph => ph.roles.forEach(r => r.items.forEach((it,idx) => !it.divider && ids.push(it.pathId))));
   return ids;
 }
 
@@ -381,14 +381,14 @@ function fieldsHTML(fields){
     const val = STATE.answers[f.key];
     if (f.type === "select"){
       const opts = ['<option value="">–</option>'].concat(
-        f.options.map(o => `<option value="${esc(o)}" ${val===o?"selected":""}>${esc(o)}</option>`)
+        f.options.map(o => { const value=typeof o==="object" ? o.value : o; const label=typeof o==="object" ? o.label : o; return `<option value="${esc(value)}" ${String(val)===String(value)?"selected":""}>${esc(label)}</option>`; })
       );
       return `<label class="field"><span>${esc(f.label)}</span><select data-fkey="${f.key}">${opts.join("")}</select></label>`;
     }
     const minAttr = f.min!==undefined ? ` min="${f.min}"` : "";
     const maxAttr = f.max!==undefined ? ` max="${f.max}"` : "";
     const stepAttr = f.step!==undefined ? ` step="${f.step}"` : "";
-    return `<label class="field"><span>${esc(f.label)}</span><input type="${f.type}" data-fkey="${f.key}" value="${esc(val||"")}" placeholder="${esc(f.placeholder||"")}"${minAttr}${maxAttr}${stepAttr}></label>`;
+    return `<label class="field"><span>${esc(f.label)}</span><input type="${f.type}" data-fkey="${f.key}" value="${esc(val ?? "")}" placeholder="${esc(f.placeholder||"")}"${minAttr}${maxAttr}${stepAttr}${f.readonly?' readonly aria-readonly="true"':''}></label>`;
   }).join("")}</div>`;
 }
 
@@ -446,14 +446,16 @@ function itemHTML(id, title, opts){
     <input type="checkbox" ${checked?'checked':''} data-id="${id}">
     <div class="item-body">
       <div class="item-title" data-id="${id}">${title}</div>
-      ${detailHTML}
+      ${opts.questionnaire ? `<details class="questionnaire" data-questionnaire="${opts.id}" ${STATE.openBlocks['questionnaire:'+opts.id]&&!checked?'open':''}><summary>Fragebogen ausfüllen <span data-questionnaire-result="${opts.id}"></span></summary>` : ''}
+      <div class="item-content">${detailHTML}
       ${fieldsStr}
       ${customStr}
       ${flagHTML}
       <button type="button" class="note-toggle" data-notetoggle="${id}">${noteVal? '– Notiz ausblenden' : '+ Notiz'}</button>
       <div class="note-wrap ${noteOpen}" data-notewrap="${id}">
         <textarea data-notekey="${id}" rows="2" placeholder="Freitext-Notiz…">${esc(noteVal)}</textarea>
-      </div>
+      </div></div>
+      ${opts.questionnaire ? "</details>" : ""}
     </div>
   </div>`;
 }
@@ -479,10 +481,10 @@ function renderPhases(){
           <button class="jumplink" data-jump="t1">Zur Prä-OP Checkliste →</button>
         </div>`;
       } else {
-        itemsHTML = r.items.map((it,idx) => itemHTML("t2:"+r.id+":"+idx, it.title, it)).join("");
+        itemsHTML = r.items.map((it,idx) => it.divider ? dividerHTML(it.divider) : itemHTML(it.pathId, it.title, it)).join("");
       }
-      const total = r.items.length;
-      const done = r.items.reduce((n,it,idx)=> n + (STATE.checked["t2:"+r.id+":"+idx] ? 1:0), 0);
+      const total = r.items.filter(it=>!it.divider).length;
+      const done = r.items.reduce((n,it,idx)=> n + (STATE.checked[it.pathId] ? 1:0), 0);
       const countLabel = r.jump ? "" : `<span class="role-count">${done}/${total}</span>`;
       return `<div class="role-block ${isOpen?'open':''}" data-role="${r.id}">
         <div class="role-head" data-role-toggle="${r.id}">
@@ -494,8 +496,8 @@ function renderPhases(){
       </div>`;
     }).join("");
 
-    const totalItems = ph.roles.reduce((n,r)=> n + r.items.length, 0);
-    const doneItems = ph.roles.reduce((n,r)=> n + r.items.reduce((m,it,idx)=> m + (STATE.checked["t2:"+r.id+":"+idx]?1:0),0), 0);
+    const totalItems = ph.roles.reduce((n,r)=> n + r.items.filter(it=>!it.divider).length, 0);
+    const doneItems = ph.roles.reduce((n,r)=> n + r.items.reduce((m,it,idx)=> m + (STATE.checked[it.pathId]?1:0),0), 0);
 
     return `<div class="phase-head">
         <span class="phase-tag">${ph.tag}</span>
@@ -527,11 +529,12 @@ function attachHandlers(){
   document.body.addEventListener('click', (e) => {
     const cb = e.target.closest('input[type=checkbox]');
     if (cb && cb.dataset.id){
+      if (cb.checked && !validateItem(cb.dataset.id)) { cb.checked = false; return; }
       STATE.checked[cb.dataset.id] = cb.checked;
       scheduleSave();
       updateProgress();
       const row = cb.closest('.item');
-      if (row) row.classList.toggle('checked', cb.checked);
+      if (row) { row.classList.toggle('checked', cb.checked); const disclosure=row.querySelector('details.questionnaire'); if(disclosure && cb.checked) disclosure.open=false; }
       const roleBlock = cb.closest('.role-block');
       if (roleBlock) refreshRoleCount(roleBlock.dataset.role);
       return;
@@ -539,7 +542,7 @@ function attachHandlers(){
     const titleEl = e.target.closest('.item-title');
     if (titleEl && titleEl.dataset.id){
       const box = document.querySelector(`input[type=checkbox][data-id="${titleEl.dataset.id}"]`);
-      if (box){ box.checked = !box.checked; box.dispatchEvent(new Event('click', {bubbles:true})); }
+      if (box){ box.click(); }
       return;
     }
     const roleToggle = e.target.closest('[data-role-toggle]');
@@ -686,15 +689,15 @@ function refreshRoleCount(roleId){
   if (!r || r.jump) return;
   const block = document.querySelector(`.role-block[data-role="${roleId}"] .role-count`);
   if (block){
-    const total = r.items.length;
-    const done = r.items.reduce((n,it,idx)=> n + (STATE.checked["t2:"+r.id+":"+idx] ? 1:0), 0);
+    const total = r.items.filter(it=>!it.divider).length;
+    const done = r.items.reduce((n,it,idx)=> n + (STATE.checked[it.pathId] ? 1:0), 0);
     block.textContent = `${done}/${total}`;
   }
   const phaseHead = document.querySelectorAll('.phase-head .phase-progress');
   const idx = PHASES.findIndex(p=>p.id===ph.id);
   if (phaseHead[idx]){
-    const totalItems = ph.roles.reduce((n,rr)=> n + rr.items.length, 0);
-    const doneItems = ph.roles.reduce((n,rr)=> n + rr.items.reduce((m,it,i2)=> m + (STATE.checked["t2:"+rr.id+":"+i2]?1:0),0), 0);
+    const totalItems = ph.roles.reduce((n,rr)=> n + rr.items.filter(it=>!it.divider).length, 0);
+    const doneItems = ph.roles.reduce((n,rr)=> n + rr.items.reduce((m,it,i2)=> m + (STATE.checked[it.pathId]?1:0),0), 0);
     phaseHead[idx].textContent = `${doneItems}/${totalItems}`;
   }
 }
@@ -722,6 +725,7 @@ function renderProgress(ids, pctId, segId){
 }
 
 function updateFlags(){
+  updateClinicalUI();
   Object.keys(FLAG_RULES).forEach(rule => {
     const text = FLAG_RULES[rule](STATE.answers);
     document.querySelectorAll(`.flag-box[data-rule="${rule}"]`).forEach(el => {
@@ -739,7 +743,8 @@ function scheduleSave(){
 
 async function saveState(){
   try{
-    await window.storage.set('bene-eras-state-v3', JSON.stringify(STATE), false);
+    await window.storage.set(caseStorageKey(), JSON.stringify(STATE), false);
+    saveCaseSummary();
     document.getElementById('saveState').textContent = 'Automatisch gespeichert · ' + new Date().toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'});
   }catch(err){
     document.getElementById('saveState').textContent = 'Speichern fehlgeschlagen — bitte Eingaben notieren';
@@ -749,7 +754,7 @@ async function saveState(){
 
 async function loadState(){
   try{
-    const res = await window.storage.get('bene-eras-state-v3', false);
+    const res = await window.storage.get(caseStorageKey(), false);
     if (res && res.value){
       const parsed = JSON.parse(res.value);
       STATE = Object.assign({ patientName:"", opDate:"", checked:{}, openBlocks:{}, answers:{}, notes:{}, labs:[], suchtmittel:[] }, parsed);
@@ -761,20 +766,20 @@ async function loadState(){
   const patient = params.get("patient");
   const caseNumber = params.get("case");
   const opDate = params.get("opdate");
-  if (patient || caseNumber){
+  if (!STATE.patientName && (patient || caseNumber)){
     STATE.patientName = [patient, caseNumber ? `Fall ${caseNumber}` : ""].filter(Boolean).join(" · ");
   }
-  if (opDate){
+  if (opDate && !STATE.opDate){
     STATE.opDate = opDate;
   }
   document.getElementById('pname').value = STATE.patientName || "";
   document.getElementById('opdate').value = STATE.opDate || "";
+  migrateState();
+  migrateQuestionnaireState();
   renderChecklist1();
   renderPhases();
   updateProgress();
   updateFlags();
   document.getElementById('saveState').textContent = 'Bereit';
+  renderWorklist();
 }
-
-attachHandlers();
-loadState();

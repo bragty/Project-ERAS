@@ -19,4 +19,13 @@ class ErasPageTests(SimpleTestCase):
         self.assertContains(response, "tab-btn")
         self.assertContains(response, "Zur Patienten")
         self.assertContains(response, "pathway-rail")
+        self.assertContains(response, 'id="worklist"')
+        self.assertContains(response, 'eras/js/meeting.js')
+        self.assertContains(response, 'eras/js/questionnaires.js')
+        self.assertNotContains(response, 'images/forms/')
         self.assertTemplateUsed(response, "eras/pages/checklist.html")
+
+    def test_archive_filter_is_available(self):
+        response = self.client.get(reverse("eras:home"))
+        self.assertContains(response, 'id="archiveFilter"')
+        self.assertContains(response, "Archivierte Fälle")
