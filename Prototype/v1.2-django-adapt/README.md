@@ -1,93 +1,165 @@
-# Eras Django Adaptation
+# ERAS Django Prototype – Backend integriert, ohne Login
 
-This directory contains a Django adaptation of the existing Eras V1.1 prototype. The original HTML files remain unchanged and were used as the source of truth for markup, styling, JavaScript behavior, and static assets.
+Diese Version basiert auf dem hochgeladenen Stand `Project-ERAS-frontend_thiago`.
+Das bestehende Frontend-Design (HTML/CSS) wurde **nicht verändert**. Nur die
+JavaScript-Datenzugriffe wurden dort angepasst, wo die Oberfläche mit dem neuen
+Django-Backend kommunizieren muss.
 
-## Folder structure
+## Was jetzt serverseitig ist
 
-- `manage.py` - Django command entry point.
-- `eras_project/` - Project settings and root URL configuration.
-- `eras/` - Django app with views, routes, tests, templates, and static files.
-- `eras/templates/eras/base.html` - Shared page shell with Django static loading and overridable blocks.
-- `eras/templates/eras/pages/` - Page templates for the front page and checklist.
-- `eras/templates/eras/includes/` - Header, footer, and modal partials extracted from the prototype.
-- `eras/static/eras/css/` - Extracted CSS files.
-- `eras/static/eras/js/` - Extracted JavaScript files plus a localStorage-backed storage helper.
-- `eras/static/eras/images/` - Copied image assets used by the prototype.
+- Patienten und Behandlungsfälle werden in der Django-Datenbank gespeichert.
+- Die Patientenübersicht lädt/sucht Fälle über eine REST-artige JSON-API.
+- Das Erfassen eines Patienten/Falls erfolgt über die API.
+- Beim Öffnen eines Patienten wird der Fall zuerst über die API aufgelöst.
+- Der vollständige Checklistenstatus pro Fall wird serverseitig gespeichert.
+- Fortschritt und `complete` werden **im Backend neu berechnet** und nicht vom Browser übernommen.
+- Serverseitige Validierung prüft Feldtypen, Zahlenbereiche, Auswahllisten,
+  Pflichtfelder, bedingte Pflichtfelder und Laborzeilen.
+- G8-, STOP-BANG- und Epworth-Scores werden serverseitig aus den Einzelantworten neu berechnet.
+- BMI, Flags und notwendige Zuweisungen werden serverseitig als abgeleitete Werte berechnet.
+- Archivieren ist serverseitig nur möglich, wenn die komplette Checkliste abgeschlossen ist.
+- Änderungen werden technisch/fachlich in `AuditEvent` protokolliert – **ohne Benutzeridentität**.
 
-## Setup
+## Bewusst nicht vorhanden
 
-From this directory:
+Das Projekt hat entsprechend dem Projektentscheid **kein Login- und kein User-System**:
+
+- keine eigene `accounts`-App
+- kein Login/Logout
+- keine Rollen/Berechtigungen
+- kein Django Admin
+- keine `django.contrib.auth`, Sessions oder Messages
+- keine User-Foreign-Keys in Antworten/Audit
+
+Wichtig: Weil keine Benutzeridentifikation existiert, kann der Audit-Trail nur
+festhalten **was** und **wann** geändert wurde, aber nicht **wer** die Änderung
+vorgenommen hat.
+
+## Architektur
+
+```text
+Browser (bestehendes HTML/CSS/JS)
+        |
+        | JSON / Fetch API
+        v
+Django API Views
+        |
+        +--> patients/services.py
+        +--> checklist/engine.py     (Validierung / Scores / Progress / Regeln)
+        +--> responses/services.py    (Persistenz Checklistenstatus)
+        +--> workflow/services.py     (Archivieren / Wiederherstellen)
+        +--> audit/services.py
+        |
+        v
+Django ORM
+        |
+        v
+SQLite (lokal) oder PostgreSQL (per Umgebungsvariablen)
+```
+
+## Backend-Struktur
+
+```text
+apps/
+├── core/          API-Helfer und gemeinsame Fehlerbehandlung
+├── patients/      Patient + TreatmentCase, Services, Selektoren, API
+├── checklist/    serverseitiges Schema + Domain Engine für Validierung/Progress
+├── responses/     ChecklistState pro Behandlungsfall
+├── workflow/      Archivieren / Wiederherstellen
+└── audit/         AuditEvent ohne Benutzerbezug
+
+api/
+└── urls.py        zentrale API-Routen
+
+eras/
+└── ...            bestehende Presentation-Schicht / Frontend
+```
+
+## API
+
+| Methode | Endpoint | Zweck |
+|---|---|---|
+| GET | `/api/health/` | Healthcheck |
+| GET | `/api/patients/?q=&archived=false` | Patienten/Fälle suchen |
+| POST | `/api/patients/` | Patient + Behandlungsfall erfassen |
+| GET | `/api/cases/<fallnummer>/` | Fall laden |
+| GET | `/api/cases/<fallnummer>/state/` | Checklistenstatus laden |
+| PUT | `/api/cases/<fallnummer>/state/` | Checklistenstatus autospeichern |
+| DELETE | `/api/cases/<fallnummer>/state/` | Checklistenstatus zurücksetzen |
+| POST | `/api/cases/<fallnummer>/archive/` | Fall archivieren |
+| POST | `/api/cases/<fallnummer>/restore/` | Archivierten Fall wiederherstellen |
+| GET | `/api/checklist/schema/` | aktuelle Backend-Schema-Metadaten |
+
+Schreibende API-Aufrufe sind nicht login-geschützt, aber weiterhin durch Djangos
+CSRF-Middleware gegen Cross-Site-Requests geschützt.
+
+## Lokal starten
 
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python manage.py migrate
 python manage.py runserver
 ```
 
-On Windows PowerShell, activate the virtual environment with:
+Windows PowerShell:
 
 ```powershell
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py runserver
 ```
 
-Open <http://127.0.0.1:8000/> for the patient overview and <http://127.0.0.1:8000/checklist/> for the checklist.
+Dann:
 
-## Verification
+- Patientenübersicht: `http://127.0.0.1:8000/`
+- Checkliste: `http://127.0.0.1:8000/checklist/`
+- Healthcheck: `http://127.0.0.1:8000/api/health/`
 
-Run:
+## Datenbank
+
+Ohne weitere Konfiguration wird SQLite (`db.sqlite3`) verwendet.
+
+Für PostgreSQL werden die Umgebungsvariablen `POSTGRES_DB`, `POSTGRES_USER`,
+`POSTGRES_PASSWORD`, `POSTGRES_HOST` und `POSTGRES_PORT` verwendet. Sobald
+`POSTGRES_DB` gesetzt ist, wechselt Django automatisch auf PostgreSQL.
+
+## Nach `git pull` auf der VM
+
+```bash
+cd /pfad/zum/projekt
+source .venv/bin/activate
+pip install -r requirements.txt
+python manage.py migrate
+sudo systemctl restart eras
+```
+
+Nginx und systemd müssen für diese Codeänderung nicht neu entworfen werden; sie
+können weiterhin auf Django unter `127.0.0.1:8000` zeigen.
+
+## Tests
 
 ```bash
 python manage.py check
 python manage.py migrate
 python manage.py test
+node --test eras/meeting.test.cjs
 ```
 
-## Notes and assumptions
+## Wichtige Hinweise
 
-- No Django models were added because the source prototype is frontend-only and stores checklist state in browser storage.
-- `window.storage` is polyfilled with `localStorage` so the existing autosave behavior works in a normal Django development browser session.
-- The KSW logo was copied into Django static files and is referenced through `{% static %}`.
-- External links from the source prototype remain external links.
-
-## KSW review 25 September 2026
-
-The current Django prototype implements the review from
-`Protokoll_Meeting_KSW_25.09.2026.pdf` using `Grundlagen/Checkliste BENE20052026.docx`
-as its content source. The older standalone HTML prototypes are historical versions.
-
-- The questionnaires section contains collapsible, interactive G8, ECOG,
-  Epworth, STOP-BANG and mMRC forms transcribed from the Word source. G8,
-  Epworth and STOP-BANG sum all individual answers automatically. Previous
-  manually entered totals remain visible as legacy values, without fabricating
-  individual answers. The source does not contain a complete NRS form, so NRS
-  retains a collapsible manual total entry.
-- Checklist completion requires explicit confirmation and valid required inputs;
-  substance-history contents are optional. Conditional fields are required only
-  where applicable. Completed items collapse and can be reopened by unchecking.
-- BMI, threshold colours, shared mMRC and pathway data, referral status, dates,
-  and copyable referral texts (including physiotherapy) are available.
-- Stationary postoperative section headings have individually confirmable measures.
-  Removed measures no longer contribute to progress. Original pathway IDs are
-  retained; previous group confirmations are not applied to individual measures.
-- Cases are stored separately by case number. Fully checked cases can be archived
-  from the overview, opened from the archive and restored. New patient entries persist.
-  This remains a localStorage prototype, without server-side patient storage.
-  The previous unassigned checklist stays at `/checklist/`; it is not silently
-  assigned to a patient case.
-
-Open items explicitly recorded by the meeting remain open:
-
-- G8 referral threshold: requires KSW confirmation; manual referral decision is available.
-- Intraoperative content: awaits clinical review.
-- KISIM laboratory import/OCR and ICT integration: not implemented. Manual entry remains.
-  The repository currently has no KISIM connector, import endpoint or OCR dependency.
-  A feasible next step is local processing of representative, de-identified exports,
-  followed by user confirmation of extracted value, unit and patient/case before import.
-  Scanned images require OCR; text PDFs can use text extraction. Both need validation
-  against real export formats before automatic field assignment can be trusted.
-
-No emails, KSW submissions, or external system changes are performed by these updates.
-
-Run the additional client logic regression tests with `node --test eras/meeting.test.cjs`.
+1. Bestehende Patientendaten aus `localStorage` werden nicht automatisch migriert.
+   Ab dieser Version sind neu erfasste Patienten und fallbezogene Checklisten in
+   der Serverdatenbank die massgebliche Quelle.
+2. Eine Checkliste ist immer einem Behandlungsfall zugeordnet. `/checklist/`
+   ohne `?case=...` wird deshalb auf die Patientenübersicht zurückgeleitet;
+   es gibt keine fallbezogene Speicherung mehr in `localStorage`.
+3. Der öffentliche Prototyp sollte ohne Login ausschliesslich mit fiktiven bzw.
+   freigegebenen Testdaten betrieben werden.
+4. Die Checklistenstruktur wird im bestehenden Frontend weiterhin gerendert; das
+   Backend spiegelt die aktuelle Version für Validierung und Progress wider.
+   Wenn Fragen strukturell geändert werden, müssen Frontend-Schema und
+   `apps/checklist/schema.py` gemeinsam versioniert werden.

@@ -1,26 +1,9 @@
-const demoPatients = [
-  {beneNurse:"Corina Frei", beneDeputy:"Jessica Ambros", surgeon:"Dr. Meier", name:"Muster Anna", patientNumber:"P-10021", caseNumber:"F-78342", opDate:"2026-08-14", procedure:"Radikale Zystektomie mit Ileum-Conduit", progress:82},
-  {beneNurse:"Corina Frei", beneDeputy:"Jessica Ambros", surgeon:"Dr. Keller", name:"Beispiel Peter", patientNumber:"P-10022", caseNumber:"F-78343", opDate:"2026-08-21", procedure:"Radikale Zystektomie mit Neoblase", progress:48},
-  {beneNurse:"Corina Frei", beneDeputy:"Jessica Ambros", surgeon:"Dr. Schmid", name:"Test Maria", patientNumber:"P-10023", caseNumber:"F-78344", opDate:"2026-09-02", procedure:"Funktionelle Zystektomie", progress:65},
-  {beneNurse:"Corina Frei", beneDeputy:"Jessica Ambros", surgeon:"Dr. Weber", name:"Demo Lukas", patientNumber:"P-10024", caseNumber:"F-78345", opDate:"", procedure:"Radikale Zystektomie mit Ileum-Conduit", progress:24},
-  {beneNurse:"Corina Frei", beneDeputy:"Jessica Ambros", surgeon:"Dr. Huber", name:"Patientin Eva", patientNumber:"P-10025", caseNumber:"F-78346", opDate:"2026-09-18", procedure:"Radikale Zystektomie mit Neoblase", progress:91},
-  {beneNurse:"Corina Frei", beneDeputy:"Jessica Ambros", surgeon:"Dr. Frei", name:"Patient Max", patientNumber:"P-10026", caseNumber:"F-78347", opDate:"2026-10-03", procedure:"Andere Eingriffsart", progress:37}
-];
-
-let patients;
-try { patients=JSON.parse(localStorage.getItem('bene-patients'))||demoPatients; } catch {patients=demoPatients;}
-let showArchived=false;
-function caseSummary(patient){
-  try{return JSON.parse(localStorage.getItem('bene-case-summary')||'{}')[patient.caseNumber]||{};}catch{return {};}
-}
-function persistPatients(){localStorage.setItem('bene-patients',JSON.stringify(patients));}
+let patients = [];
+let showArchived = false;
+let searchTimer = null;
 
 function esc(value){
   return String(value == null ? "" : value).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-}
-
-function patientLabel(patient){
-  return [patient.name || "Unbenannte/r Patient*in", patient.caseNumber ? `Fall ${patient.caseNumber}` : "", patient.procedure || ""].filter(Boolean).join(" · ");
 }
 
 function checklistUrl(patient){
@@ -32,28 +15,20 @@ function checklistUrl(patient){
   return `${base}?${params.toString()}`;
 }
 
-function goToChecklist(patient){
-  window.location.href = checklistUrl(patient);
+async function goToChecklist(patient){
+  try {
+    // Resolve the selected case through the backend before navigation. This
+    // prevents stale browser-only patient data from being used.
+    const payload = await window.erasApi.fetch(`/api/cases/${encodeURIComponent(patient.caseNumber)}/`);
+    window.location.href = checklistUrl(payload.case);
+  } catch (err) {
+    alert(err.message || "Fall konnte nicht geöffnet werden.");
+  }
 }
 
-function patientMatches(patient, query){
-  const haystack = [
-    patient.name,
-    patient.patientNumber,
-    patient.caseNumber,
-    patient.opDate,
-    patient.procedure,
-    patient.surgeon,
-    patient.beneNurse
-  ].join(" ").toLowerCase();
-  return haystack.includes(query.trim().toLowerCase());
-}
-
-function patientRowHTML(patient, idx){
-  const summary=caseSummary(patient);
-  patient={...patient,progress:summary.progress ?? 0};
+function patientRowHTML(patient){
   return `
-    <div class="patient-row clickable" data-patient-index="${idx}" tabindex="0" role="link" aria-label="Checkliste f?r ${esc(patient.name || "Patient")} ?ffnen">
+    <div class="patient-row clickable" data-case-number="${esc(patient.caseNumber)}" tabindex="0" role="link" aria-label="Checkliste für ${esc(patient.name || "Patient")} öffnen">
       <div><strong>${esc(patient.name || "-")}</strong><small>${esc(patient.patientNumber || "")}</small></div>
       <div>${esc(patient.caseNumber || "-")}</div>
       <div>${esc(patient.opDate || "offen")}</div>
@@ -61,14 +36,10 @@ function patientRowHTML(patient, idx){
       <div class="progress-cell">
         <div class="progress-track"><div class="progress-fill" style="width:${Number(patient.progress || 0)}%"></div></div>
         <span class="progress-value">${Number(patient.progress || 0)}%</span>
-        <button class="btn" data-archive-case="${idx}" ${!summary.archived && !summary.complete?'disabled title="Alle Checklistenpunkte müssen abgeschlossen sein"':''}>${summary.archived?'Wiederherstellen':'Archivieren'}</button>
+        <button class="btn" data-archive-case="${esc(patient.caseNumber)}" ${!patient.archived && !patient.complete?'disabled title="Alle Checklistenpunkte müssen abgeschlossen sein"':''}>${patient.archived?'Wiederherstellen':'Archivieren'}</button>
       </div>
     </div>
   `;
-}
-
-function renderPatients(){
-  renderSearchResults();
 }
 
 function updatePreview(patient){
@@ -91,22 +62,31 @@ function tableHeaderHTML(){
 }
 
 function renderSearchResults(){
-  const input = document.getElementById("patientSearch");
   const results = document.getElementById("patientSearchResults");
-  const query = input.value.trim();
-  const matches = patients
-    .map((patient, idx) => ({patient, idx}))
-    .filter(item => !!caseSummary(item.patient).archived===showArchived)
-    .filter(item => !query || patientMatches(item.patient, query));
-  const label = query ? `${matches.length} Treffer` : (showArchived ? "Archivierte Fälle" : "Aktive Fälle");
-
+  const query = document.getElementById("patientSearch").value.trim();
+  const label = query ? `${patients.length} Treffer` : (showArchived ? "Archivierte Fälle" : "Aktive Fälle");
   results.innerHTML = `
     <div class="search-results-head">${esc(label)}</div>
     <div class="patient-table search-table">
       ${tableHeaderHTML()}
-      ${matches.length ? matches.map(item => patientRowHTML(item.patient, item.idx)).join("") : `<div class="empty-results">Keine passenden Patientinnen oder Patienten gefunden.</div>`}
+      ${patients.length ? patients.map(patientRowHTML).join("") : `<div class="empty-results">Keine passenden Patientinnen oder Patienten gefunden.</div>`}
     </div>
   `;
+}
+
+async function loadPatients(){
+  const results = document.getElementById("patientSearchResults");
+  const query = document.getElementById("patientSearch").value.trim();
+  try {
+    const params = new URLSearchParams({ archived: String(showArchived) });
+    if (query) params.set("q", query);
+    const payload = await window.erasApi.fetch(`/api/patients/?${params.toString()}`);
+    patients = payload.results || [];
+    renderSearchResults();
+  } catch (err) {
+    patients = [];
+    results.innerHTML = `<div class="empty-results">${esc(err.message || "Patienten konnten nicht geladen werden.")}</div>`;
+  }
 }
 
 function openModal(){
@@ -128,7 +108,7 @@ function clearModal(){
   });
 }
 
-function savePatient(){
+async function savePatient(){
   const patient = {
     beneNurse: document.getElementById("newBeneNurse").value.trim(),
     beneDeputy: document.getElementById("newBeneDeputy").value.trim(),
@@ -139,45 +119,60 @@ function savePatient(){
     opDate: document.getElementById("newOpDate").value,
     procedure: document.getElementById("newProcedure").value
   };
-  if(!patient.name || !patient.caseNumber){alert('Name und eindeutige Fallnummer sind erforderlich.');return;}
-  if(patients.some(p=>p.caseNumber===patient.caseNumber)){alert('Diese Fallnummer existiert bereits.');return;}
-  patient.progress = 0;
-  patients.push(patient);
-  persistPatients();
-  document.getElementById("patientSearch").value = patient.caseNumber;
-  renderPatients();
-  updatePreview(patient);
-  clearModal();
-  closeModal();
+  if(!patient.name || !patient.caseNumber){alert("Name und eindeutige Fallnummer sind erforderlich.");return;}
+  try {
+    const payload = await window.erasApi.fetch("/api/patients/", {
+      method: "POST",
+      body: JSON.stringify(patient)
+    });
+    document.getElementById("patientSearch").value = payload.case.caseNumber;
+    updatePreview(payload.case);
+    clearModal();
+    closeModal();
+    await loadPatients();
+  } catch (err) {
+    alert(err.message || "Patient konnte nicht gespeichert werden.");
+  }
 }
 
-function handlePatientRowClick(event){
-  const archive=event.target.closest('[data-archive-case]');
+function findCase(caseNumber){
+  return patients.find(patient => patient.caseNumber === caseNumber);
+}
+
+async function handlePatientRowClick(event){
+  const archive = event.target.closest("[data-archive-case]");
   if(archive){
-    const patient=patients[Number(archive.dataset.archiveCase)];
-    const summaries=JSON.parse(localStorage.getItem('bene-case-summary')||'{}');
-    const summary=summaries[patient.caseNumber]||{};
-    if(!summary.archived && !summary.complete) return;
-    summaries[patient.caseNumber]={...summary,archived:!summary.archived};
-    try{localStorage.setItem('bene-case-summary',JSON.stringify(summaries));renderPatients();}catch{alert('Archivierung konnte nicht gespeichert werden.');}
+    event.stopPropagation();
+    const caseNumber = archive.dataset.archiveCase;
+    const patient = findCase(caseNumber);
+    if (!patient || (!patient.archived && !patient.complete)) return;
+    try {
+      const action = patient.archived ? "restore" : "archive";
+      await window.erasApi.fetch(`/api/cases/${encodeURIComponent(caseNumber)}/${action}/`, { method: "POST", body: "{}" });
+      await loadPatients();
+    } catch (err) {
+      alert(err.message || "Archivierung konnte nicht gespeichert werden.");
+    }
     return;
   }
-  const row = event.target.closest("[data-patient-index]");
+  const row = event.target.closest("[data-case-number]");
   if (!row) return;
-  const patient = patients[parseInt(row.dataset.patientIndex, 10)];
+  const patient = findCase(row.dataset.caseNumber);
+  if (!patient) return;
   updatePreview(patient);
-  goToChecklist(patient);
+  await goToChecklist(patient);
 }
 
-function handlePatientRowKeydown(event){
+async function handlePatientRowKeydown(event){
   if(event.target.closest("button")) return;
   if (event.key !== "Enter" && event.key !== " ") return;
-  const row = event.target.closest("[data-patient-index]");
+  const row = event.target.closest("[data-case-number]");
   if (!row) return;
   event.preventDefault();
-  const patient = patients[parseInt(row.dataset.patientIndex, 10)];
+  const patient = findCase(row.dataset.caseNumber);
+  if (!patient) return;
   updatePreview(patient);
-  goToChecklist(patient);
+  await goToChecklist(patient);
 }
 
 document.getElementById("newPatientBtn").addEventListener("click", () => {
@@ -190,16 +185,18 @@ document.getElementById("patientModal").addEventListener("click", event => {
   if (event.target.id === "patientModal") closeModal();
 });
 document.getElementById("savePatient").addEventListener("click", savePatient);
-document.getElementById("patientSearch").addEventListener("input", renderSearchResults);
+document.getElementById("patientSearch").addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(loadPatients, 200);
+});
 document.getElementById("patientSearchResults").addEventListener("click", handlePatientRowClick);
 document.getElementById("patientSearchResults").addEventListener("keydown", handlePatientRowKeydown);
 
-
-renderPatients();
-
-document.getElementById('archiveFilter').addEventListener('click',event=>{
-  showArchived=!showArchived;
-  event.target.textContent=showArchived?'Aktive Fälle':'Archivierte Fälle';
-  event.target.setAttribute('aria-pressed',String(showArchived));
-  renderPatients();
+document.getElementById("archiveFilter").addEventListener("click", async event => {
+  showArchived = !showArchived;
+  event.target.textContent = showArchived ? "Aktive Fälle" : "Archivierte Fälle";
+  event.target.setAttribute("aria-pressed", String(showArchived));
+  await loadPatients();
 });
+
+loadPatients();

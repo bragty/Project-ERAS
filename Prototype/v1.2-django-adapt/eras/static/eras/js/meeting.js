@@ -48,12 +48,8 @@ function migrateState(){
   STATE.schemaVersion=2;
 }
 function saveCaseSummary(){
-  const caseId=new URLSearchParams(location.search).get('case');
-  if(!caseId) return;
-  const ids=allItemIds();
-  const summary=JSON.parse(localStorage.getItem('bene-case-summary')||'{}');
-  summary[caseId]={...summary[caseId],progress:Math.round(ids.filter(id=>STATE.checked[id]).length/ids.length*100),complete:ids.every(id=>STATE.checked[id])};
-  localStorage.setItem('bene-case-summary',JSON.stringify(summary));
+  // Case progress/completion is calculated and persisted by the Django backend.
+  // The function remains as a compatibility hook for checklist.js.
 }
 function getItem(id){
   return id.startsWith('t1:') ? itemById(id.slice(3)) : PHASES.flatMap(p=>p.roles.flatMap(r=>r.items)).find(it=>it.pathId===id);
