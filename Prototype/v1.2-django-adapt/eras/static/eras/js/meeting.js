@@ -14,7 +14,7 @@ itemById('anaesthesie').detail = ['So bald wie möglich, wenn möglich mindesten
 itemById('pbm').detail[1] = 'Bei perioperativer Immunochemotherapie: PBM durch Onkologie, telefonische Rücksprache mit behandelnder Onkologie (wenn nicht definiert Dr. Gina Treichler). Sonst Hausarzt mit klarem Auftrag gemäss Weisung informieren; falls Eiseninfusion dort nicht möglich: medizinische Poliklinik, Tel. 3751, Stichwort PBM.';
 itemById('physio1').detail.push('KISIM: Workflow → neu → Gemeinsame Favoriten → Anmeldung Physiotherapie ambulant ViTA-Reha präoperativ bzw. postoperativ. Operation: Zystektomie mit Anlage Ileum conduit oder orthotope Ersatzblase. Keine Limiten.');
 itemById('thromboinfo').detail.push('Gemäss BENE-Checkliste: postoperativ jeder Zystektomie-Patient; präoperativ bei perioperativer Immunchemotherapie Eliquis 2.5 mg 1-0-1 während der Immunchemotherapie. Auf Rezept: 2 Tage vor Operation stoppen.');
-itemById('laborwerte').detail = ['Hämatogramm gross; Quick/INR; Ferritin und Transferrinsättigung; Kreatinin, Natrium, Kalium, CRP; Troponin T und BNP.', 'Laborimport/OCR aus KISIM: technische Machbarkeit noch offen. Werte hier manuell erfassen.'];
+itemById('laborwerte').detail = ['Hämatogramm gross; Quick/INR; Ferritin und Transferrinsättigung; Kreatinin, Natrium, Kalium, CRP; Troponin T und BNP.', 'Laborberichte können als PDF oder Bild importiert und vor der Übernahme kontrolliert werden. Die manuelle Erfassung bleibt weiterhin möglich.'];
 PHASES[0].roles.find(r=>r.id==='p-uro').items = PHASES[0].roles.find(r=>r.id==='p-uro').items.filter(it=>!it.title.includes('BENE-Nurse informieren'));
 const stoma = PHASES[0].roles.find(r=>r.id==='p-stoma');
 stoma.items = [stoma.items[0]];

@@ -49,6 +49,8 @@ def get_state(treatment_case):
 
 @transaction.atomic
 def save_state(treatment_case, raw_state):
+    from apps.checklist.lab_import.validation import validate_imported_labs
+    validate_imported_labs(raw_state.get("labs") or [])
     state_obj, _ = ChecklistState.objects.select_for_update().get_or_create(
         treatment_case=treatment_case,
         defaults={"state": default_state(treatment_case)},
@@ -89,6 +91,36 @@ def save_state(treatment_case, raw_state):
                 "revision": state_obj.revision,
                 "progress": summary["progress"],
                 "complete": summary["complete"],
+            },
+        )
+
+    def import_keys(state):
+        keys = set()
+        details = {}
+        for row in state.get("labs") or []:
+            meta = row.get("importMeta") if isinstance(row, dict) else None
+            if not isinstance(meta, dict) or not meta.get("sourceHash") or not meta.get("labId"):
+                continue
+            key = (str(meta.get("sourceHash")), str(meta.get("labId")), str(meta.get("measurementAt") or ""))
+            keys.add(key)
+            details[key] = meta
+        return keys, details
+
+    old_imports, _old_import_details = import_keys(old_state)
+    new_imports, new_import_details = import_keys(normalized)
+    added_imports = new_imports - old_imports
+    if added_imports:
+        record_event(
+            event_type="lab_import_confirmed",
+            treatment_case=treatment_case,
+            entity_type="ChecklistState",
+            entity_id=state_obj.id,
+            metadata={
+                "count": len(added_imports),
+                "sourceHashes": sorted({key[0][:16] for key in added_imports}),
+                "labIds": sorted({key[1] for key in added_imports}),
+                "measurementTimes": sorted({key[2] for key in added_imports if key[2]}),
+                "revision": state_obj.revision,
             },
         )
     return state_obj, normalized, summary, derived, errors

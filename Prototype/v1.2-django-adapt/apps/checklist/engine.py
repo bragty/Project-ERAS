@@ -13,6 +13,8 @@ from .schema import (
     QUESTIONNAIRES,
     REFERRAL_IDS,
 )
+from .lab_import.mapping import CATALOG_BY_LABEL
+from .lab_import.parser import normalize_numeric
 
 
 def _as_number(value):
@@ -109,6 +111,17 @@ def validate_item(item_id, state):
             errors["labs"] = "Mindestens einen Laborwert mit Wert und Einheit erfassen."
         elif any(not all(str(row.get(k, "")).strip() for k in ("type", "value", "unit")) for row in nonempty):
             errors["labs"] = "Jede Laborzeile benötigt Laborwert, Wert und Einheit."
+        else:
+            row_errors = []
+            for index, row in enumerate(nonempty):
+                label = str(row.get("type") or "").strip()
+                value = str(row.get("value") or "").strip()
+                if label not in CATALOG_BY_LABEL:
+                    row_errors.append(f"Zeile {index + 1}: unbekannter Laborparameter.")
+                elif label != "Anderer Wert" and normalize_numeric(value)[1] is None:
+                    row_errors.append(f"Zeile {index + 1}: numerischer Wert erwartet (optional mit < oder >).")
+            if row_errors:
+                errors["labs"] = " ".join(row_errors)
     return errors
 
 

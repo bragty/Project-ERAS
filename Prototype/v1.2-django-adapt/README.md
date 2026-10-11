@@ -153,13 +153,142 @@ node --test eras/meeting.test.cjs
 
 1. Bestehende Patientendaten aus `localStorage` werden nicht automatisch migriert.
    Ab dieser Version sind neu erfasste Patienten und fallbezogene Checklisten in
-   der Serverdatenbank die massgebliche Quelle.
+   der Serverdatenbank die maßgebliche Quelle.
 2. Eine Checkliste ist immer einem Behandlungsfall zugeordnet. `/checklist/`
    ohne `?case=...` wird deshalb auf die Patientenübersicht zurückgeleitet;
    es gibt keine fallbezogene Speicherung mehr in `localStorage`.
-3. Der öffentliche Prototyp sollte ohne Login ausschliesslich mit fiktiven bzw.
+3. Der öffentliche Prototyp sollte ohne Login ausschließlich mit fiktiven bzw.
    freigegebenen Testdaten betrieben werden.
 4. Die Checklistenstruktur wird im bestehenden Frontend weiterhin gerendert; das
    Backend spiegelt die aktuelle Version für Validierung und Progress wider.
    Wenn Fragen strukturell geändert werden, müssen Frontend-Schema und
    `apps/checklist/schema.py` gemeinsam versioniert werden.
+
+## Laborbericht-Import (PDF / Bild)
+
+Im Abschnitt **Labor (inkl. PBM)** kann zusätzlich zur manuellen Erfassung ein
+Laborbericht als PDF, PNG oder JPEG verarbeitet werden. Der Import ist bewusst
+zweistufig:
+
+```text
+Datei auswählen / Drag & Drop
+        ↓
+POST /api/cases/<fallnummer>/labs/import/
+        ↓
+Text-PDF: pdfplumber / Scan oder Bild: Tesseract OCR
+        ↓
+vorlagenbasierte Zuordnung + Warnungen
+        ↓
+Importvorschau im Browser
+        ↓
+medizinische/fachliche Kontrolle
+        ↓
+"Werte übernehmen"
+        ↓
+bestehender ChecklistState-Autosave
+```
+
+Der Upload-Endpunkt speichert die Datei **nicht dauerhaft**. Er gibt nur
+strukturierte Vorschläge zurück. Erst bestätigte Werte werden über den bereits
+bestehenden ChecklistState-Speicherweg persistiert.
+
+### Import-API
+
+| Methode | Endpoint | Zweck |
+|---|---|---|
+| POST | `/api/cases/<fallnummer>/labs/import/` | Laborbericht verarbeiten und Importvorschläge liefern |
+
+Der Request ist `multipart/form-data` mit genau einem Feld `file`.
+Unterstützt werden PDF, PNG und JPEG. Dateiendung und Dateiinhalt werden
+gegeneinander geprüft.
+
+### Mapping und Berichtsformat
+
+Die zentrale Zuordnung zwischen erkannten Laborbezeichnungen und den bereits
+vorhandenen Dropdown-Werten liegt in:
+
+```text
+apps/checklist/lab_import/mapping.py
+```
+
+Die Extraktionslogik liegt in:
+
+```text
+apps/checklist/lab_import/parser.py
+apps/checklist/lab_import/service.py
+```
+
+Der Parser ist ausschliesslich auf die bereitgestellte Vorlage **Beispiel Labor.pdf**
+ausgerichtet: Untersuchungen | Flag | Resultat | Einheit | Referenzbereich.
+Der frühere Verlaufstabellen-Parser und generische Text-Fallback sind entfernt.
+Es werden nur vollständige registrierte Laborbezeichnungen aus dem bestehenden
+Dropdown importiert. Nicht unterstützte Untersuchungen werden ignoriert;
+«Anderer Wert» bleibt ausschliesslich für die manuelle Erfassung verfügbar.
+
+Das Beispiel ist ein Bild-PDF und benötigt Tesseract mit `deu+eng`. Unklare
+Einheiten werden gezielt erneut gelesen und bleiben bei Unsicherheit leer.
+Jeder OCR-Vorschlag muss kontrolliert und bewusst ausgewählt werden.
+Das Entnahmedatum wird aus dem gleichnamigen Kopf-Feld gelesen; Befunddatum
+und Laboreingangsdatum sind keine Messzeitpunkte.
+
+Details, Prüfergebnisse und Änderungsübersicht: `LAB_IMPORT_IMPLEMENTATION.md`.
+
+### Neue Python-/Systemabhängigkeiten
+
+Python-Abhängigkeiten werden wie gewohnt installiert:
+
+```bash
+pip install -r requirements.txt
+```
+
+Für OCR muss auf Ubuntu zusätzlich Tesseract vorhanden sein:
+
+```bash
+sudo apt update
+sudo apt install -y tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng
+```
+
+Prüfen:
+
+```bash
+tesseract --version
+tesseract --list-langs | grep -E 'deu|eng'
+```
+
+Für digital erzeugte PDFs wird zuerst der vorhandene Text direkt gelesen. OCR
+wird nur für Bilddateien bzw. PDF-Seiten verwendet, auf denen die direkte
+Textextraktion keine verwertbare Labortabelle liefert.
+
+### Konfiguration
+
+Optionale Umgebungsvariablen:
+
+```text
+LAB_IMPORT_MAX_BYTES=10485760
+LAB_IMPORT_MAX_PAGES=10
+LAB_IMPORT_MAX_IMAGE_PIXELS=25000000
+LAB_IMPORT_OCR_TIMEOUT_SECONDS=30
+LAB_IMPORT_OCR_LANG=deu+eng
+```
+
+### Sicherheit und aktuelle Projektgrenze
+
+- Uploads werden nur im Kontext einer existierenden Fallnummer verarbeitet.
+- Schreibende Requests bleiben durch Django-CSRF geschützt.
+- Temporäre PDF-Dateien werden nach der Verarbeitung entfernt.
+- Gewöhnliche Logs/Audit-Einträge enthalten keine vollständigen Laborberichte.
+- Der Audit-Trail protokolliert nur strukturelle Importinformationen wie Hash,
+  Anzahl bestätigter Werte und interne Labor-IDs.
+- Das Projekt besitzt gemäss Projektentscheid **kein Login-/User-System**.
+  Deshalb ist aktuell auch keine benutzerbezogene Berechtigungsprüfung möglich.
+  Für einen produktiven klinischen Einsatz muss Authentifizierung/Autorisierung
+  ergänzt werden; CSRF und Fallkontext ersetzen diese nicht.
+
+### Wichtige Einschränkung
+
+Der im Repository vorhandene Beispielstand enthält einen Labor-Screenshot, aber
+keinen vollständigen originalen Labor-PDF-Export mit allen benötigten Parametern.
+Der OCR-Pfad wurde daher gegen den verfügbaren Screenshot und der Text-PDF-Pfad
+gegen eine synthetische tabellarische PDF-Struktur geprüft. Vor einer fachlichen
+Abnahme müssen anonymisierte Originalberichte (digitales PDF, Scan/Bild,
+mehrseitig) mit manuell geprüften Sollwerten getestet werden.

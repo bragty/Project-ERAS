@@ -10,7 +10,10 @@
     const method = String(config.method || "GET").toUpperCase();
     if (!["GET", "HEAD", "OPTIONS", "TRACE"].includes(method)) {
       config.headers["X-CSRFToken"] = getCookie("csrftoken");
-      if (config.body && !config.headers["Content-Type"]) config.headers["Content-Type"] = "application/json";
+      // FormData must keep the browser-generated multipart boundary. JSON
+      // requests continue to receive the existing application/json header.
+      const isFormData = typeof FormData !== "undefined" && config.body instanceof FormData;
+      if (config.body && !isFormData && !config.headers["Content-Type"]) config.headers["Content-Type"] = "application/json";
     }
     const response = await fetch(url, config);
     let payload = {};

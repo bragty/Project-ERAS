@@ -15,6 +15,7 @@ ALLOWED_HOSTS = [
     if value.strip()
 ]
 
+# Deliberately no django.contrib.auth/admin/sessions: the prototype has no login/user system.
 INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "eras",
@@ -85,6 +86,15 @@ CSRF_TRUSTED_ORIGINS = [
     if value.strip()
 ]
 
-# write operations remain protected by Django's CSRF middleware.
+# The prototype is same-origin only. The API is intentionally unauthenticated,
+# but write operations remain protected by Django's CSRF middleware.
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
+
+# Laboratory report import. The first prototype processes one file per request
+# synchronously and keeps no permanent copy of the uploaded report.
+LAB_IMPORT_MAX_BYTES = int(os.getenv("LAB_IMPORT_MAX_BYTES", str(10 * 1024 * 1024)))
+LAB_IMPORT_MAX_PAGES = int(os.getenv("LAB_IMPORT_MAX_PAGES", "10"))
+LAB_IMPORT_MAX_IMAGE_PIXELS = int(os.getenv("LAB_IMPORT_MAX_IMAGE_PIXELS", "25000000"))
+LAB_IMPORT_OCR_TIMEOUT_SECONDS = int(os.getenv("LAB_IMPORT_OCR_TIMEOUT_SECONDS", "30"))
+LAB_IMPORT_OCR_LANG = os.getenv("LAB_IMPORT_OCR_LANG", "deu+eng")
