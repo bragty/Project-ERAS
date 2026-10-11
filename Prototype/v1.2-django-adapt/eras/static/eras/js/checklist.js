@@ -354,6 +354,14 @@ const LAB_OPTIONS = [
   "Hb", "Leukozyten", "Thrombozyten", "Quick / INR", "Ferritin", "Transferrinsättigung",
   "Kreatinin", "Natrium", "Kalium", "CRP", "Troponin T", "BNP", "Albumin", "Anderer Wert"
 ];
+const LAB_ID_BY_LABEL = {
+  "Hb":"hb","Leukozyten":"leukozyten","Thrombozyten":"thrombozyten","Quick / INR":"quick_inr",
+  "Ferritin":"ferritin","Transferrinsättigung":"transferrinsaettigung","Kreatinin":"kreatinin","Natrium":"natrium",
+  "Kalium":"kalium","CRP":"crp","Troponin T":"troponin_t","BNP":"bnp","Albumin":"albumin","Anderer Wert":"other"
+};
+const LAB_IMPORT_OPTIONS = LAB_OPTIONS.filter(label => label !== "Anderer Wert");
+let LAB_IMPORT_PREVIEW = null;
+let LAB_IMPORT_BUSY = false;
 
 let STATE = { patientName:"", opDate:"", checked:{}, openBlocks:{}, answers:{}, notes:{}, labs:[], suchtmittel:[] };
 let saveTimer = null;
@@ -368,7 +376,7 @@ function preopItemIds(){
 
 function pathItemIds(){
   const ids = [];
-  PHASES.forEach(ph => ph.roles.forEach(r => r.items.forEach((it,idx) => ids.push("t2:"+r.id+":"+idx))));
+  PHASES.forEach(ph => ph.roles.forEach(r => r.items.forEach((it,idx) => !it.divider && ids.push(it.pathId))));
   return ids;
 }
 
@@ -381,14 +389,14 @@ function fieldsHTML(fields){
     const val = STATE.answers[f.key];
     if (f.type === "select"){
       const opts = ['<option value="">–</option>'].concat(
-        f.options.map(o => `<option value="${esc(o)}" ${val===o?"selected":""}>${esc(o)}</option>`)
+        f.options.map(o => { const value=typeof o==="object" ? o.value : o; const label=typeof o==="object" ? o.label : o; return `<option value="${esc(value)}" ${String(val)===String(value)?"selected":""}>${esc(label)}</option>`; })
       );
       return `<label class="field"><span>${esc(f.label)}</span><select data-fkey="${f.key}">${opts.join("")}</select></label>`;
     }
     const minAttr = f.min!==undefined ? ` min="${f.min}"` : "";
     const maxAttr = f.max!==undefined ? ` max="${f.max}"` : "";
     const stepAttr = f.step!==undefined ? ` step="${f.step}"` : "";
-    return `<label class="field"><span>${esc(f.label)}</span><input type="${f.type}" data-fkey="${f.key}" value="${esc(val||"")}" placeholder="${esc(f.placeholder||"")}"${minAttr}${maxAttr}${stepAttr}></label>`;
+    return `<label class="field"><span>${esc(f.label)}</span><input type="${f.type}" data-fkey="${f.key}" value="${esc(val ?? "")}" placeholder="${esc(f.placeholder||"")}"${minAttr}${maxAttr}${stepAttr}${f.readonly?' readonly aria-readonly="true"':''}></label>`;
   }).join("")}</div>`;
 }
 
@@ -398,10 +406,80 @@ function optionsHTML(options, val){
   ).join("");
 }
 
+function currentCaseNumber(){
+  return new URLSearchParams(window.location.search).get('case') || '';
+}
+
+function formatMeasurementTime(value){
+  if(!value) return 'Messzeitpunkt nicht erkannt';
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toLocaleString('de-CH',{dateStyle:'short',timeStyle:'short'}) : value;
+}
+
+function labImportPreviewHTML(){
+  if(!LAB_IMPORT_PREVIEW) return '';
+  const patient = LAB_IMPORT_PREVIEW.patientMatch || {status:'unverified',message:'Patientenzuordnung nicht geprüft.'};
+  const times = LAB_IMPORT_PREVIEW.measurementTimes || [];
+  const selectedTime = LAB_IMPORT_PREVIEW.selectedTime ?? times[0] ?? '';
+  const suggestions = (LAB_IMPORT_PREVIEW.suggestions || []).filter(item => !selectedTime || item.measurementAt === selectedTime);
+  const patientClass = patient.status === 'match' ? 'ok' : patient.status === 'mismatch' ? 'error' : 'warning';
+  const globalWarnings = (LAB_IMPORT_PREVIEW.warnings || []).map(w=>`<li>${esc(w)}</li>`).join('');
+  return `<div class="lab-import-preview" data-lab-import-preview>
+    <div class="lab-import-preview-head">
+      <strong>Importvorschau</strong>
+      <span>${esc(LAB_IMPORT_PREVIEW.fileName || '')}</span>
+    </div>
+    <div class="lab-import-patient ${patientClass}">${esc(patient.message || '')}</div>
+    ${patient.status==='unverified' ? `<label class="lab-import-confirm"><input type="checkbox" data-lab-patient-confirm> Patient/Fall wurde anhand des geöffneten Falls manuell kontrolliert.</label>` : ''}
+    ${times.length>1 ? `<label class="field lab-import-time"><span>Messzeitpunkt</span><select data-lab-import-time>${times.map(t=>`<option value="${esc(t)}" ${t===selectedTime?'selected':''}>${esc(formatMeasurementTime(t))}</option>`).join('')}</select></label>` : ''}
+    ${globalWarnings ? `<ul class="lab-import-warnings">${globalWarnings}</ul>` : ''}
+    <div class="lab-import-results">
+      ${suggestions.length ? suggestions.map((item,index)=>{
+        const sourceIndex = (LAB_IMPORT_PREVIEW.suggestions||[]).indexOf(item);
+        const hasConflict = (item.existingConflicts || []).length>0;
+        const disabled = !!item.alreadyImported || !!LAB_IMPORT_PREVIEW.blocked;
+        const checked = item.status==='ready' && !hasConflict && !disabled ? 'checked' : '';
+        const warnings = (item.warnings||[]).map(w=>`<li>${esc(w)}</li>`).join('');
+        const conflict = hasConflict ? `<div class="lab-import-conflict">Vorhanden: ${(item.existingConflicts||[]).map(c=>`${esc(c.value)} ${esc(c.unit)}`).join(', ')}. Bei Auswahl wird der erste vorhandene Wert dieses Parameters ersetzt.</div>` : '';
+        const key = `${item.labId}|${item.measurementAt||''}|${item.sourcePage}|${sourceIndex}`;
+        return `<article class="lab-import-result ${item.status==='review'?'review':''}">
+          <label class="lab-import-select"><input type="checkbox" data-lab-import-select="${esc(key)}" data-lab-import-index="${sourceIndex}" ${checked} ${disabled?'disabled':''}> Übernehmen</label>
+          <div class="lab-import-grid">
+            <label><span>Laborparameter</span><select disabled aria-label="Erkannter Laborparameter" data-lab-preview-index="${sourceIndex}" data-lab-preview-field="labLabel">${optionsHTML(LAB_IMPORT_OPTIONS,item.labLabel)}</select><small>Erkannt: ${esc(item.originalLabel||'')}</small></label>
+            <label><span>Wert</span><div class="lab-import-value"><select data-lab-preview-index="${sourceIndex}" data-lab-preview-field="comparisonOperator">${['','<','>','<=','>='].map(op=>`<option value="${esc(op)}" ${op===(item.comparisonOperator||'')?'selected':''}>${esc(op||'=')}</option>`).join('')}</select><input type="text" data-lab-preview-index="${sourceIndex}" data-lab-preview-field="normalizedValue" value="${esc(item.normalizedValue||'')}"></div><small>Original: ${esc(item.originalValue||'')}</small></label>
+            <label><span>Einheit</span><input type="text" data-lab-preview-index="${sourceIndex}" data-lab-preview-field="normalizedUnit" value="${esc(item.normalizedUnit||'')}"><small>Original: ${esc(item.originalUnit||'')}</small></label>
+            <label><span>Messzeitpunkt</span><input type="datetime-local" data-lab-preview-index="${sourceIndex}" data-lab-preview-field="measurementAt" value="${esc(item.measurementAt||'')}"><small>Seite ${esc(item.sourcePage)}</small></label>
+          </div>
+          ${conflict}
+          ${warnings ? `<ul class="lab-import-warnings">${warnings}</ul>` : ''}
+          <details class="lab-import-source"><summary>Fundstelle anzeigen</summary><code>${esc(item.sourceExcerpt||'Keine Fundstelle verfügbar')}</code></details>
+        </article>`;
+      }).join('') : '<p class="lab-import-empty">Für diesen Messzeitpunkt wurden keine unterstützten Werte erkannt.</p>'}
+    </div>
+    <div class="lab-import-actions">
+      <button type="button" class="btn" data-lab-import-cancel>Abbrechen</button>
+      <button type="button" class="btn primary" data-lab-import-apply ${LAB_IMPORT_PREVIEW.blocked?'disabled':''}>Werte übernehmen</button>
+    </div>
+  </div>`;
+}
+
+function labImportHTML(){
+  return `<section class="lab-import-box" aria-label="Laborbericht importieren">
+    <div class="lab-dropzone ${LAB_IMPORT_BUSY?'busy':''}" data-lab-dropzone role="button" tabindex="0" aria-label="Laborbericht als PDF oder Bild auswählen oder hier ablegen">
+      <input type="file" accept="application/pdf,image/png,image/jpeg" data-lab-file hidden>
+      <strong>Laborbericht importieren</strong>
+      <span>${LAB_IMPORT_BUSY ? 'Bericht wird verarbeitet …' : 'KISIM-Laborbericht im vereinbarten Format als PDF oder Bild ablegen.'}</span>
+      <button type="button" class="btn" data-lab-file-button ${LAB_IMPORT_BUSY?'disabled':''}>Datei auswählen</button>
+    </div>
+    <div class="lab-import-status" data-lab-import-status aria-live="polite">${LAB_IMPORT_PREVIEW ? 'Bericht verarbeitet. Bitte erkannte Werte prüfen.' : ''}</div>
+    ${labImportPreviewHTML()}
+  </section>`;
+}
+
 function labRowsHTML(){
   const rows = STATE.labs && STATE.labs.length ? STATE.labs : [{type:"", value:"", unit:""}];
   STATE.labs = rows;
-  return `<div class="dynamic-list" data-dynamic="labs">
+  return `${labImportHTML()}<div class="dynamic-list" data-dynamic="labs">
     ${rows.map((row, idx) => `<div class="dynamic-row">
       <label class="field"><span>Laborwert</span><select data-lab-idx="${idx}" data-lab-key="type">${optionsHTML(LAB_OPTIONS, row.type)}</select></label>
       <label class="field"><span>Wert</span><input type="text" data-lab-idx="${idx}" data-lab-key="value" value="${esc(row.value||"")}"></label>
@@ -410,6 +488,92 @@ function labRowsHTML(){
     </div>`).join("")}
     <button type="button" class="add-row-btn" data-add-lab>+ Laborwert hinzufügen</button>
   </div>`;
+}
+
+async function processLabImport(file){
+  if(!file || LAB_IMPORT_BUSY) return;
+  const caseNumber = currentCaseNumber();
+  if(!caseNumber){
+    alert('Laborberichte können nur innerhalb eines geöffneten Behandlungsfalls importiert werden.');
+    return;
+  }
+  LAB_IMPORT_BUSY = true;
+  LAB_IMPORT_PREVIEW = null;
+  renderChecklist1();
+  try{
+    const body = new FormData();
+    body.append('file', file);
+    const payload = await window.erasApi.fetch(`/api/cases/${encodeURIComponent(caseNumber)}/labs/import/`, {method:'POST', body});
+    payload.selectedTime = (payload.measurementTimes || [])[0] || '';
+    LAB_IMPORT_PREVIEW = payload;
+  }catch(err){
+    LAB_IMPORT_PREVIEW = null;
+    alert(err?.message || 'Laborbericht konnte nicht verarbeitet werden.');
+  }finally{
+    LAB_IMPORT_BUSY = false;
+    renderChecklist1();
+    updateFlags();
+  }
+}
+
+function applyLabImport(){
+  if(!LAB_IMPORT_PREVIEW || LAB_IMPORT_PREVIEW.blocked) return;
+  const patient = LAB_IMPORT_PREVIEW.patientMatch || {};
+  if(patient.status==='unverified'){
+    const confirmed = document.querySelector('[data-lab-patient-confirm]')?.checked;
+    if(!confirmed){
+      alert('Bitte bestätigen, dass der Bericht zum aktuell geöffneten Patienten/Fall gehört.');
+      return;
+    }
+  }
+  const checkedIndexes = new Set([...document.querySelectorAll('[data-lab-import-index]:checked')].map(el=>Number(el.dataset.labImportIndex)));
+  const selected = (LAB_IMPORT_PREVIEW.suggestions||[]).filter((item,index)=>checkedIndexes.has(index) && !item.alreadyImported);
+  if(!selected.length){ alert('Keine Werte zur Übernahme ausgewählt.'); return; }
+  const invalid = selected.find(item=>!LAB_IMPORT_OPTIONS.includes(item.labLabel) || LAB_ID_BY_LABEL[item.labLabel]!==item.labId || !/^[+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+)$/.test(String(item.normalizedValue??'').trim()) || !['','<','>','<=','>='].includes(item.comparisonOperator||'') || !String(item.normalizedUnit||'').trim());
+  if(invalid){
+    alert('Bitte für alle ausgewählten Importwerte Laborparameter, Wert und Einheit vollständig prüfen.');
+    return;
+  }
+
+  if(new Set(selected.map(item=>item.labId)).size !== selected.length){
+    alert('Mehrere Ergebnisse für denselben Laborparameter ausgewählt. Bitte genau eines auswählen.');
+    return;
+  }
+  // A manual edit made while the import was running also needs confirmation.
+  const conflicts = selected.filter(item=>STATE.labs.some(row=>row.type===item.labLabel && String(row.value||'').trim()));
+  if(conflicts.length && !confirm('Vorhandene Werte ersetzen: '+conflicts.map(item=>item.labLabel).join(', ')+'?')) return;
+
+  selected.forEach(item=>{
+    const value = `${item.comparisonOperator||''}${item.normalizedValue||''}`;
+    const meta = {
+      sourceHash: item.sourceHash,
+      labId: item.labId,
+      measurementAt: item.measurementAt || null,
+      sourcePage: item.sourcePage,
+      extractionMethod: item.extractionMethod,
+      originalLabel: item.originalLabel,
+      originalValue: item.originalValue,
+      originalUnit: item.originalUnit,
+      templateId: item.templateId,
+      confirmedAt: new Date().toISOString()
+    };
+    const exactDuplicate = STATE.labs.find(row=>{
+      const existing = row.importMeta || {};
+      return existing.sourceHash===meta.sourceHash && existing.labId===meta.labId && existing.measurementAt===meta.measurementAt;
+    });
+    if(exactDuplicate) return;
+
+    const conflictIndex = STATE.labs.findIndex(row=>row.type===item.labLabel && String(row.value||'').trim());
+    const target = conflictIndex>=0 ? conflictIndex : STATE.labs.findIndex(row=>!row.type && !String(row.value||'').trim() && !String(row.unit||'').trim());
+    const row = {type:item.labLabel, value, unit:item.normalizedUnit||item.originalUnit||'', importMeta:meta};
+    if(target>=0) STATE.labs[target]=row; else STATE.labs.push(row);
+  });
+  delete STATE.checked['t1:laborwerte'];
+  LAB_IMPORT_PREVIEW = null;
+  renderChecklist1();
+  updateProgress();
+  updateFlags();
+  scheduleSave();
 }
 
 function suchtRowsHTML(){
@@ -446,14 +610,16 @@ function itemHTML(id, title, opts){
     <input type="checkbox" ${checked?'checked':''} data-id="${id}">
     <div class="item-body">
       <div class="item-title" data-id="${id}">${title}</div>
-      ${detailHTML}
+      ${opts.questionnaire ? `<details class="questionnaire" data-questionnaire="${opts.id}" ${STATE.openBlocks['questionnaire:'+opts.id]&&!checked?'open':''}><summary>Fragebogen ausfüllen <span data-questionnaire-result="${opts.id}"></span></summary>` : ''}
+      <div class="item-content">${detailHTML}
       ${fieldsStr}
       ${customStr}
       ${flagHTML}
       <button type="button" class="note-toggle" data-notetoggle="${id}">${noteVal? '– Notiz ausblenden' : '+ Notiz'}</button>
       <div class="note-wrap ${noteOpen}" data-notewrap="${id}">
         <textarea data-notekey="${id}" rows="2" placeholder="Freitext-Notiz…">${esc(noteVal)}</textarea>
-      </div>
+      </div></div>
+      ${opts.questionnaire ? "</details>" : ""}
     </div>
   </div>`;
 }
@@ -479,10 +645,10 @@ function renderPhases(){
           <button class="jumplink" data-jump="t1">Zur Prä-OP Checkliste →</button>
         </div>`;
       } else {
-        itemsHTML = r.items.map((it,idx) => itemHTML("t2:"+r.id+":"+idx, it.title, it)).join("");
+        itemsHTML = r.items.map((it,idx) => it.divider ? dividerHTML(it.divider) : itemHTML(it.pathId, it.title, it)).join("");
       }
-      const total = r.items.length;
-      const done = r.items.reduce((n,it,idx)=> n + (STATE.checked["t2:"+r.id+":"+idx] ? 1:0), 0);
+      const total = r.items.filter(it=>!it.divider).length;
+      const done = r.items.reduce((n,it,idx)=> n + (STATE.checked[it.pathId] ? 1:0), 0);
       const countLabel = r.jump ? "" : `<span class="role-count">${done}/${total}</span>`;
       return `<div class="role-block ${isOpen?'open':''}" data-role="${r.id}">
         <div class="role-head" data-role-toggle="${r.id}">
@@ -494,8 +660,8 @@ function renderPhases(){
       </div>`;
     }).join("");
 
-    const totalItems = ph.roles.reduce((n,r)=> n + r.items.length, 0);
-    const doneItems = ph.roles.reduce((n,r)=> n + r.items.reduce((m,it,idx)=> m + (STATE.checked["t2:"+r.id+":"+idx]?1:0),0), 0);
+    const totalItems = ph.roles.reduce((n,r)=> n + r.items.filter(it=>!it.divider).length, 0);
+    const doneItems = ph.roles.reduce((n,r)=> n + r.items.reduce((m,it,idx)=> m + (STATE.checked[it.pathId]?1:0),0), 0);
 
     return `<div class="phase-head">
         <span class="phase-tag">${ph.tag}</span>
@@ -525,13 +691,28 @@ function scrollToChecklistTarget(tab, selector){
 
 function attachHandlers(){
   document.body.addEventListener('click', (e) => {
+    const fileButton = e.target.closest('[data-lab-file-button]');
+    if (fileButton){
+      fileButton.closest('[data-lab-dropzone]')?.querySelector('[data-lab-file]')?.click();
+      return;
+    }
+    const applyImport = e.target.closest('[data-lab-import-apply]');
+    if (applyImport){ applyLabImport(); return; }
+    const cancelImport = e.target.closest('[data-lab-import-cancel]');
+    if (cancelImport){ LAB_IMPORT_PREVIEW=null; renderChecklist1(); updateFlags(); return; }
+    const dropzoneClick = e.target.closest('[data-lab-dropzone]');
+    if (dropzoneClick && !e.target.closest('button,input,select')){
+      dropzoneClick.querySelector('[data-lab-file]')?.click();
+      return;
+    }
     const cb = e.target.closest('input[type=checkbox]');
     if (cb && cb.dataset.id){
+      if (cb.checked && !validateItem(cb.dataset.id)) { cb.checked = false; return; }
       STATE.checked[cb.dataset.id] = cb.checked;
       scheduleSave();
       updateProgress();
       const row = cb.closest('.item');
-      if (row) row.classList.toggle('checked', cb.checked);
+      if (row) { row.classList.toggle('checked', cb.checked); const disclosure=row.querySelector('details.questionnaire'); if(disclosure && cb.checked) disclosure.open=false; }
       const roleBlock = cb.closest('.role-block');
       if (roleBlock) refreshRoleCount(roleBlock.dataset.role);
       return;
@@ -539,7 +720,7 @@ function attachHandlers(){
     const titleEl = e.target.closest('.item-title');
     if (titleEl && titleEl.dataset.id){
       const box = document.querySelector(`input[type=checkbox][data-id="${titleEl.dataset.id}"]`);
-      if (box){ box.checked = !box.checked; box.dispatchEvent(new Event('click', {bubbles:true})); }
+      if (box){ box.click(); }
       return;
     }
     const roleToggle = e.target.closest('[data-role-toggle]');
@@ -613,6 +794,15 @@ function attachHandlers(){
   });
 
   document.body.addEventListener('input', (e) => {
+    const previewField = e.target.closest('[data-lab-preview-field]');
+    if (previewField && LAB_IMPORT_PREVIEW){
+      const item = LAB_IMPORT_PREVIEW.suggestions?.[Number(previewField.dataset.labPreviewIndex)];
+      if(item){
+        item[previewField.dataset.labPreviewField] = previewField.value;
+        if(previewField.dataset.labPreviewField==='labLabel') item.labId = LAB_ID_BY_LABEL[previewField.value] || 'other';
+      }
+      return;
+    }
     const f = e.target.closest('[data-fkey]');
     if (f){
       STATE.answers[f.dataset.fkey] = f.value;
@@ -643,6 +833,23 @@ function attachHandlers(){
   });
 
   document.body.addEventListener('change', (e) => {
+    const fileInput = e.target.closest('[data-lab-file]');
+    if(fileInput){ processLabImport(fileInput.files?.[0]); return; }
+    const importTime = e.target.closest('[data-lab-import-time]');
+    if(importTime && LAB_IMPORT_PREVIEW){
+      LAB_IMPORT_PREVIEW.selectedTime = importTime.value;
+      renderChecklist1();
+      return;
+    }
+    const previewField = e.target.closest('[data-lab-preview-field]');
+    if (previewField && LAB_IMPORT_PREVIEW){
+      const item = LAB_IMPORT_PREVIEW.suggestions?.[Number(previewField.dataset.labPreviewIndex)];
+      if(item){
+        item[previewField.dataset.labPreviewField] = previewField.value;
+        if(previewField.dataset.labPreviewField==='labLabel') item.labId = LAB_ID_BY_LABEL[previewField.value] || 'other';
+      }
+      return;
+    }
     const f = e.target.closest('select[data-fkey]');
     if (f){
       STATE.answers[f.dataset.fkey] = f.value;
@@ -677,6 +884,31 @@ function attachHandlers(){
       saveState(true);
     }
   });
+
+  document.body.addEventListener('keydown', e=>{
+    const zone=e.target.closest('[data-lab-dropzone]');
+    if(zone && (e.key==='Enter'||e.key===' ')){
+      e.preventDefault();
+      zone.querySelector('[data-lab-file]')?.click();
+    }
+  });
+  document.body.addEventListener('dragover', e=>{
+    const zone=e.target.closest('[data-lab-dropzone]');
+    if(!zone) return;
+    e.preventDefault();
+    zone.classList.add('dragover');
+  });
+  document.body.addEventListener('dragleave', e=>{
+    e.target.closest('[data-lab-dropzone]')?.classList.remove('dragover');
+  });
+  document.body.addEventListener('drop', e=>{
+    const zone=e.target.closest('[data-lab-dropzone]');
+    if(!zone) return;
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    const file=e.dataTransfer?.files?.[0];
+    if(file) processLabImport(file);
+  });
 }
 
 function refreshRoleCount(roleId){
@@ -686,15 +918,15 @@ function refreshRoleCount(roleId){
   if (!r || r.jump) return;
   const block = document.querySelector(`.role-block[data-role="${roleId}"] .role-count`);
   if (block){
-    const total = r.items.length;
-    const done = r.items.reduce((n,it,idx)=> n + (STATE.checked["t2:"+r.id+":"+idx] ? 1:0), 0);
+    const total = r.items.filter(it=>!it.divider).length;
+    const done = r.items.reduce((n,it,idx)=> n + (STATE.checked[it.pathId] ? 1:0), 0);
     block.textContent = `${done}/${total}`;
   }
   const phaseHead = document.querySelectorAll('.phase-head .phase-progress');
   const idx = PHASES.findIndex(p=>p.id===ph.id);
   if (phaseHead[idx]){
-    const totalItems = ph.roles.reduce((n,rr)=> n + rr.items.length, 0);
-    const doneItems = ph.roles.reduce((n,rr)=> n + rr.items.reduce((m,it,i2)=> m + (STATE.checked["t2:"+rr.id+":"+i2]?1:0),0), 0);
+    const totalItems = ph.roles.reduce((n,rr)=> n + rr.items.filter(it=>!it.divider).length, 0);
+    const doneItems = ph.roles.reduce((n,rr)=> n + rr.items.reduce((m,it,i2)=> m + (STATE.checked[it.pathId]?1:0),0), 0);
     phaseHead[idx].textContent = `${doneItems}/${totalItems}`;
   }
 }
@@ -722,6 +954,7 @@ function renderProgress(ids, pctId, segId){
 }
 
 function updateFlags(){
+  updateClinicalUI();
   Object.keys(FLAG_RULES).forEach(rule => {
     const text = FLAG_RULES[rule](STATE.answers);
     document.querySelectorAll(`.flag-box[data-rule="${rule}"]`).forEach(el => {
@@ -739,7 +972,8 @@ function scheduleSave(){
 
 async function saveState(){
   try{
-    await window.storage.set('bene-eras-state-v3', JSON.stringify(STATE), false);
+    await window.storage.set(caseStorageKey(), JSON.stringify(STATE), false);
+    saveCaseSummary();
     document.getElementById('saveState').textContent = 'Automatisch gespeichert · ' + new Date().toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'});
   }catch(err){
     document.getElementById('saveState').textContent = 'Speichern fehlgeschlagen — bitte Eingaben notieren';
@@ -749,7 +983,7 @@ async function saveState(){
 
 async function loadState(){
   try{
-    const res = await window.storage.get('bene-eras-state-v3', false);
+    const res = await window.storage.get(caseStorageKey(), false);
     if (res && res.value){
       const parsed = JSON.parse(res.value);
       STATE = Object.assign({ patientName:"", opDate:"", checked:{}, openBlocks:{}, answers:{}, notes:{}, labs:[], suchtmittel:[] }, parsed);
@@ -761,20 +995,20 @@ async function loadState(){
   const patient = params.get("patient");
   const caseNumber = params.get("case");
   const opDate = params.get("opdate");
-  if (patient || caseNumber){
+  if (!STATE.patientName && (patient || caseNumber)){
     STATE.patientName = [patient, caseNumber ? `Fall ${caseNumber}` : ""].filter(Boolean).join(" · ");
   }
-  if (opDate){
+  if (opDate && !STATE.opDate){
     STATE.opDate = opDate;
   }
   document.getElementById('pname').value = STATE.patientName || "";
   document.getElementById('opdate').value = STATE.opDate || "";
+  migrateState();
+  migrateQuestionnaireState();
   renderChecklist1();
   renderPhases();
   updateProgress();
   updateFlags();
   document.getElementById('saveState').textContent = 'Bereit';
+  renderWorklist();
 }
-
-attachHandlers();
-loadState();

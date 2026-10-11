@@ -12,11 +12,24 @@ class ErasPageTests(SimpleTestCase):
         self.assertTemplateUsed(response, "eras/pages/home.html")
 
     def test_checklist_route_renders_checklist_shell(self):
-        response = self.client.get(reverse("eras:checklist"))
+        response = self.client.get(reverse("eras:checklist") + "?case=F-TEST")
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "items-t1")
         self.assertContains(response, "tab-btn")
         self.assertContains(response, "Zur Patienten")
         self.assertContains(response, "pathway-rail")
+        self.assertContains(response, 'id="worklist"')
+        self.assertContains(response, 'eras/js/meeting.js')
+        self.assertContains(response, 'eras/js/questionnaires.js')
+        self.assertNotContains(response, 'images/forms/')
         self.assertTemplateUsed(response, "eras/pages/checklist.html")
+
+    def test_archive_filter_is_available(self):
+        response = self.client.get(reverse("eras:home"))
+        self.assertContains(response, 'id="archiveFilter"')
+        self.assertContains(response, "Archivierte Fälle")
+
+    def test_checklist_without_case_redirects_home(self):
+        response = self.client.get(reverse("eras:checklist"))
+        self.assertRedirects(response, reverse("eras:home"))
