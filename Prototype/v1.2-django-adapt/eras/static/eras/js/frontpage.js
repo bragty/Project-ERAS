@@ -36,7 +36,16 @@ function patientRowHTML(patient){
       <div class="progress-cell">
         <div class="progress-track"><div class="progress-fill" style="width:${Number(patient.progress || 0)}%"></div></div>
         <span class="progress-value">${Number(patient.progress || 0)}%</span>
-        <button class="btn" data-archive-case="${esc(patient.caseNumber)}" ${!patient.archived && !patient.complete?'disabled title="Alle Checklistenpunkte müssen abgeschlossen sein"':''}>${patient.archived?'Wiederherstellen':'Archivieren'}</button>
+        <button
+  class="btn archive-icon"
+  data-archive-case="${esc(patient.caseNumber)}"
+  aria-label="${patient.archived ? 'Wiederherstellen' : 'Archivieren'}"
+  title="${!patient.archived && !patient.complete
+    ? 'Alle Checklistenpunkte müssen abgeschlossen sein'
+    : patient.archived ? 'Wiederherstellen' : 'Archivieren'}"
+  ${!patient.archived && !patient.complete ? 'disabled' : ''}>
+  <span aria-hidden="true">${patient.archived ? '↶' : '▣'}</span>
+</button>
       </div>
     </div>
   `;
