@@ -74,3 +74,17 @@ Minimale Frontend-Erweiterung nur innerhalb des bestehenden Laborpunkts:
 
 Das bestehende visuelle Grunddesign und der manuelle Labor-Erfassungsweg bleiben
 unverändert erhalten.
+
+## Live-Aktualisierung bei mehreren Arbeitsplätzen
+
+- neuer Endpoint `GET /api/cases/<fallnummer>/state/revision/` (leichtgewichtig, nur Revision + Zeitpunkt)
+- `PUT /api/cases/<fallnummer>/state/` akzeptiert optional `baseRevision`; ist der Fall
+  zwischenzeitlich anderswo gespeichert worden, antwortet das Backend mit `409 revision_conflict`
+  statt die fremden Änderungen zu überschreiben (ohne `baseRevision` unverändertes Verhalten)
+- `checklist.js`: offene Checklisten fragen alle 3 s die Revision ab und übernehmen neuere
+  Serverstände per Drei-Wege-Merge feldweise; noch nicht gespeicherte lokale Eingaben bleiben
+  erhalten, Fokus, Cursor, Scrollposition und geöffnete Notizen/Zuweisungen ebenfalls.
+  Auf- und zugeklappte Blöcke (`openBlocks`) bleiben pro Arbeitsplatz lokal.
+- `frontpage.js`: Patientenübersicht aktualisiert sich alle 5 s (nur bei Änderungen neu gerendert)
+- Polling pausiert in Hintergrund-Tabs und läuft beim Zurückwechseln sofort an.
+  Keine zusätzliche Infrastruktur (WebSockets/Redis) nötig; Nginx/systemd bleiben unverändert.

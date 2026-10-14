@@ -83,19 +83,35 @@ function renderSearchResults(){
   `;
 }
 
-async function loadPatients(){
+async function loadPatients(options){
+  const background = !!(options && options.background);
   const results = document.getElementById("patientSearchResults");
   const query = document.getElementById("patientSearch").value.trim();
   try {
     const params = new URLSearchParams({ archived: String(showArchived) });
     if (query) params.set("q", query);
     const payload = await window.erasApi.fetch(`/api/patients/?${params.toString()}`);
-    patients = payload.results || [];
+    // A background refresh must not overwrite results of a newer search.
+    if (background && query !== document.getElementById("patientSearch").value.trim()) return;
+    const next = payload.results || [];
+    // Re-render only on changes, so focus/hover in the table is not disturbed.
+    if (background && JSON.stringify(next) === JSON.stringify(patients)) return;
+    patients = next;
     renderSearchResults();
   } catch (err) {
+    if (background) return;
     patients = [];
     results.innerHTML = `<div class="empty-results">${esc(err.message || "Patienten konnten nicht geladen werden.")}</div>`;
   }
+}
+
+// Keeps the overview current while other workstations edit cases.
+const PATIENT_POLL_MS = 5000;
+let patientPollBusy = false;
+async function pollPatients(){
+  if (patientPollBusy || document.hidden || searchTimer) return;
+  patientPollBusy = true;
+  try { await loadPatients({ background: true }); } finally { patientPollBusy = false; }
 }
 
 function openModal(){
@@ -196,7 +212,7 @@ document.getElementById("patientModal").addEventListener("click", event => {
 document.getElementById("savePatient").addEventListener("click", savePatient);
 document.getElementById("patientSearch").addEventListener("input", () => {
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(loadPatients, 200);
+  searchTimer = setTimeout(() => { searchTimer = null; loadPatients(); }, 200);
 });
 document.getElementById("patientSearchResults").addEventListener("click", handlePatientRowClick);
 document.getElementById("patientSearchResults").addEventListener("keydown", handlePatientRowKeydown);
@@ -209,3 +225,5 @@ document.getElementById("archiveFilter").addEventListener("click", async event =
 });
 
 loadPatients();
+setInterval(pollPatients, PATIENT_POLL_MS);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) pollPatients(); });

@@ -84,7 +84,8 @@ eras/
 | POST | `/api/patients/` | Patient + Behandlungsfall erfassen |
 | GET | `/api/cases/<fallnummer>/` | Fall laden |
 | GET | `/api/cases/<fallnummer>/state/` | Checklistenstatus laden |
-| PUT | `/api/cases/<fallnummer>/state/` | Checklistenstatus autospeichern |
+| PUT | `/api/cases/<fallnummer>/state/` | Checklistenstatus autospeichern (optional `baseRevision`, sonst 409 bei Konflikt) |
+| GET | `/api/cases/<fallnummer>/state/revision/` | aktuelle Revision für Live-Aktualisierung |
 | DELETE | `/api/cases/<fallnummer>/state/` | Checklistenstatus zurücksetzen |
 | POST | `/api/cases/<fallnummer>/archive/` | Fall archivieren |
 | POST | `/api/cases/<fallnummer>/restore/` | Archivierten Fall wiederherstellen |

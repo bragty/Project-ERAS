@@ -46,13 +46,17 @@
       }
       throw new Error("Checklisten können nur fallbezogen gespeichert werden.");
     },
-    async set(key, value) {
+    async set(key, value, options) {
       const caseNumber = caseNumberFromStorageKey(key);
       if (caseNumber) {
         const state = typeof value === "string" ? JSON.parse(value) : value;
+        const body = { state };
+        // With baseRevision the backend answers 409 if another workstation
+        // saved in the meantime, instead of silently overwriting its changes.
+        if (options && Number.isInteger(options.baseRevision)) body.baseRevision = options.baseRevision;
         const payload = await apiFetch(`/api/cases/${encodeURIComponent(caseNumber)}/state/`, {
           method: "PUT",
-          body: JSON.stringify({ state })
+          body: JSON.stringify(body)
         });
         window.erasBackend = payload;
         return { value: JSON.stringify(payload.state), summary: payload.summary, derived: payload.derived, revision: payload.revision };

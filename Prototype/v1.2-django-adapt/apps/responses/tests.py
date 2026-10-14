@@ -76,3 +76,42 @@ class ChecklistStateApiTests(TestCase):
         self.assertEqual(response.json()["counts"]["preop"], 24)
         self.assertEqual(response.json()["counts"]["path"], 93)
         self.assertEqual(response.json()["counts"]["total"], 117)
+
+    def revision_url(self):
+        return reverse("responses_api:case-state-revision", kwargs={"case_number": self.case.case_number})
+
+    def put_state(self, state, base_revision=None):
+        body = {"state": state}
+        if base_revision is not None:
+            body["baseRevision"] = base_revision
+        return self.client.put(self.state_url(), data=json.dumps(body), content_type="application/json")
+
+    def test_revision_endpoint_reflects_saves(self):
+        payload = self.client.get(self.state_url()).json()
+        response = self.client.get(self.revision_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["revision"], payload["revision"])
+        self.put_state(payload["state"], payload["revision"])
+        self.assertEqual(self.client.get(self.revision_url()).json()["revision"], payload["revision"] + 1)
+
+    def test_save_with_outdated_base_revision_is_rejected(self):
+        payload = self.client.get(self.state_url()).json()
+        first = dict(payload["state"], answers={"score_nrs": "4"})
+        self.assertEqual(self.put_state(first, payload["revision"]).status_code, 200)
+
+        # Second workstation still works on the old revision.
+        second = dict(payload["state"], answers={"score_nrs": "1"})
+        response = self.put_state(second, payload["revision"])
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["error"]["code"], "revision_conflict")
+        self.assertEqual(self.client.get(self.state_url()).json()["state"]["answers"]["score_nrs"], "4")
+
+    def test_save_without_base_revision_stays_compatible(self):
+        state = self.client.get(self.state_url()).json()["state"]
+        self.assertEqual(self.put_state(state).status_code, 200)
+        self.assertEqual(self.put_state(state).status_code, 200)
+
+    def test_invalid_base_revision_is_rejected(self):
+        state = self.client.get(self.state_url()).json()["state"]
+        response = self.client.put(self.state_url(), data=json.dumps({"state": state, "baseRevision": "1"}), content_type="application/json")
+        self.assertEqual(response.status_code, 400)

@@ -4,6 +4,7 @@ from datetime import date, datetime
 from django.db import transaction
 
 from apps.audit.services import record_event
+from apps.core.api import ApiError
 from apps.checklist.engine import default_state, evaluate_state
 
 from .models import ChecklistState
@@ -47,14 +48,40 @@ def get_state(treatment_case):
     return state_obj, normalized, summary, derived, errors
 
 
+def get_revision(treatment_case):
+    """Cheap lookup for clients polling for changes made on other workstations."""
+    row = (
+        ChecklistState.objects.filter(treatment_case=treatment_case)
+        .values("revision", "updated_at")
+        .first()
+    )
+    if row is None:
+        return 0, None
+    return row["revision"], row["updated_at"]
+
+
 @transaction.atomic
-def save_state(treatment_case, raw_state):
+def save_state(treatment_case, raw_state, base_revision=None):
+    """Persist a full checklist state.
+
+    When ``base_revision`` is given, the save is rejected with a conflict if
+    another client saved in the meantime. The client then merges the newer
+    server state into its local edits and retries, so concurrent edits on
+    different fields do not overwrite each other.
+    """
     from apps.checklist.lab_import.validation import validate_imported_labs
     validate_imported_labs(raw_state.get("labs") or [])
     state_obj, _ = ChecklistState.objects.select_for_update().get_or_create(
         treatment_case=treatment_case,
         defaults={"state": default_state(treatment_case)},
     )
+    if base_revision is not None and base_revision != state_obj.revision:
+        raise ApiError(
+            "Die Checkliste wurde zwischenzeitlich an einem anderen Arbeitsplatz geändert.",
+            status=409,
+            code="revision_conflict",
+            fields={"revision": state_obj.revision},
+        )
     old_state = deepcopy(state_obj.state or {})
     normalized, summary, derived, errors = evaluate_state(raw_state, treatment_case)
 

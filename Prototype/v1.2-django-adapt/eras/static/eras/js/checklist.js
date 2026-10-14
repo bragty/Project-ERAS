@@ -874,7 +874,7 @@ function attachHandlers(){
   document.getElementById('printBtn').addEventListener('click', () => window.print());
   document.getElementById('resetBtn').addEventListener('click', () => {
     if (confirm('Wirklich zurücksetzen? Alle Häkchen, Eingaben und Notizen dieser Checkliste werden gelöscht.')){
-      STATE = { patientName:"", opDate:"", checked:{}, openBlocks:{}, answers:{}, notes:{}, labs:[], suchtmittel:[] };
+      STATE = emptyState();
       document.getElementById('pname').value = "";
       document.getElementById('opdate').value = "";
       renderChecklist1();
@@ -967,17 +967,215 @@ function updateFlags(){
 function scheduleSave(){
   clearTimeout(saveTimer);
   document.getElementById('saveState').textContent = 'speichere …';
-  saveTimer = setTimeout(() => saveState(false), 500);
+  saveTimer = setTimeout(() => { saveTimer = null; saveState(false); }, 500);
+}
+
+/* ============================= LIVE SYNC ============================= */
+// Several workstations may edit the same case at the same time. Each save
+// carries the server revision it is based on (409 on conflict), and every
+// open checklist polls the revision. Newer server states are merged into the
+// local state field by field: remote changes are shown immediately, local
+// edits that are not saved yet are kept and saved afterwards.
+const SYNC_POLL_MS = 3000;
+const SYNC = { revision:null, base:null, saving:false, resave:false, polling:false };
+// UI preferences per workstation; never taken over from other clients.
+const LOCAL_ONLY_KEYS = ['openBlocks'];
+
+function emptyState(){
+  return { patientName:"", opDate:"", checked:{}, openBlocks:{}, answers:{}, notes:{}, labs:[], suchtmittel:[] };
+}
+
+function cloneValue(value){
+  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+}
+
+function isPlainObject(value){
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function deepEqual(a, b){
+  if (a === b) return true;
+  if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((v,i) => deepEqual(v, b[i]));
+  if (isPlainObject(a) && isPlainObject(b)){
+    const keys = Object.keys(a);
+    return keys.length === Object.keys(b).length && keys.every(k => Object.prototype.hasOwnProperty.call(b, k) && deepEqual(a[k], b[k]));
+  }
+  return false;
+}
+
+// Three-way merge. Lists (labs, suchtmittel) are treated as one value; if the
+// same value was changed locally and remotely, the local (newer) edit wins.
+function mergeStates(base, local, remote){
+  if (deepEqual(local, base)) return cloneValue(remote);
+  if (deepEqual(remote, base)) return cloneValue(local);
+  if (isPlainObject(local) && isPlainObject(remote)){
+    const b = isPlainObject(base) ? base : {};
+    const out = {};
+    new Set([...Object.keys(local), ...Object.keys(remote)]).forEach(k => {
+      const value = mergeStates(b[k], local[k], remote[k]);
+      if (value !== undefined) out[k] = value;
+    });
+    return out;
+  }
+  return cloneValue(local);
+}
+
+function withoutLocalOnly(state){
+  const copy = Object.assign({}, state);
+  LOCAL_ONLY_KEYS.forEach(k => delete copy[k]);
+  return copy;
+}
+
+// Applies the same client-side migrations as loadState, so server states and
+// the local state are compared in the same shape.
+function normalizeClientState(raw){
+  const current = STATE;
+  STATE = Object.assign(emptyState(), cloneValue(raw) || {});
+  try{
+    migrateState();
+    migrateQuestionnaireState();
+    return STATE;
+  }finally{
+    STATE = current;
+  }
+}
+
+function captureUIState(){
+  const ui = { focus:null, notes:[], referrals:[] };
+  const el = document.activeElement;
+  if (el && el !== document.body){
+    const attrs = ['data-fkey','data-notekey','data-lab-idx','data-lab-key','data-sucht-idx','data-sucht-key','data-referral','data-property'];
+    const selector = el.id ? '#'+CSS.escape(el.id)
+      : attrs.filter(a => el.hasAttribute(a)).map(a => `[${a}="${CSS.escape(el.getAttribute(a))}"]`).join('');
+    if (selector){
+      ui.focus = { selector, index:[...document.querySelectorAll(selector)].indexOf(el) };
+      try{ ui.focus.start = el.selectionStart; ui.focus.end = el.selectionEnd; }catch(_){ /* not a text field */ }
+    }
+  }
+  document.querySelectorAll('.note-wrap.open[data-notewrap]').forEach(w => ui.notes.push(w.dataset.notewrap));
+  document.querySelectorAll('details.referral').forEach((d,i) => { if (d.open) ui.referrals.push(i); });
+  ui.scrollY = window.scrollY;
+  return ui;
+}
+
+function restoreUIState(ui){
+  ui.notes.forEach(id => {
+    const wrap = document.querySelector(`[data-notewrap="${CSS.escape(id)}"]`);
+    if (!wrap) return;
+    wrap.classList.add('open');
+    const toggle = document.querySelector(`[data-notetoggle="${CSS.escape(id)}"]`);
+    if (toggle) toggle.textContent = '– Notiz ausblenden';
+  });
+  const referrals = document.querySelectorAll('details.referral');
+  ui.referrals.forEach(i => { if (referrals[i]) referrals[i].open = true; });
+  if (ui.focus){
+    const matches = document.querySelectorAll(ui.focus.selector);
+    const el = matches[ui.focus.index] || matches[0];
+    if (el){
+      el.focus({preventScroll:true});
+      if (ui.focus.start != null){
+        try{ el.setSelectionRange(ui.focus.start, ui.focus.end); }catch(_){ /* not a text field */ }
+      }
+    }
+  }
+  window.scrollTo(window.scrollX, ui.scrollY);
+}
+
+function rerenderFromState(){
+  const ui = captureUIState();
+  const pname = document.getElementById('pname');
+  const opdate = document.getElementById('opdate');
+  if (document.activeElement !== pname) pname.value = STATE.patientName || "";
+  if (document.activeElement !== opdate) opdate.value = STATE.opDate || "";
+  renderChecklist1();
+  renderPhases();
+  updateProgress();
+  updateFlags();
+  restoreUIState(ui);
+}
+
+// Merges a (normalized) server state into STATE and re-renders if needed.
+function adoptRemoteState(base, remote){
+  const merged = mergeStates(base, STATE, remote);
+  LOCAL_ONLY_KEYS.forEach(k => { merged[k] = STATE[k]; });
+  const changed = !deepEqual(merged, STATE);
+  if (changed){
+    STATE = Object.assign(emptyState(), merged);
+    rerenderFromState();
+  }
+  return changed;
+}
+
+async function pullRemoteState(force){
+  const res = await window.storage.get(caseStorageKey(), false);
+  // A save finished meanwhile and already delivered a newer state.
+  if (!force && (SYNC.saving || (SYNC.revision != null && res.revision <= SYNC.revision))) return { changed:false, localEdits:false };
+  const remote = normalizeClientState(JSON.parse(res.value));
+  const changed = adoptRemoteState(SYNC.base || remote, remote);
+  SYNC.base = remote;
+  SYNC.revision = res.revision;
+  return { changed, localEdits:!deepEqual(withoutLocalOnly(STATE), withoutLocalOnly(remote)) };
+}
+
+function syncTime(){
+  return new Date().toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'});
+}
+
+async function pollRemoteState(){
+  if (SYNC.polling || SYNC.saving || saveTimer || document.hidden || SYNC.revision == null || !currentCaseNumber()) return;
+  SYNC.polling = true;
+  try{
+    const res = await window.erasApi.fetch(`/api/cases/${encodeURIComponent(currentCaseNumber())}/state/revision/`);
+    if (res.revision === SYNC.revision || SYNC.saving || saveTimer) return;
+    const { changed, localEdits } = await pullRemoteState(false);
+    if (changed) document.getElementById('saveState').textContent = 'Aktualisiert (Änderung von anderem Arbeitsplatz) · ' + syncTime();
+    if (localEdits) scheduleSave();
+  }catch(err){
+    console.warn('Live-Aktualisierung fehlgeschlagen', err);
+  }finally{
+    SYNC.polling = false;
+  }
+}
+
+function startLiveSync(){
+  setInterval(pollRemoteState, SYNC_POLL_MS);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) pollRemoteState(); });
 }
 
 async function saveState(){
+  if (SYNC.saving){ SYNC.resave = true; return; }
+  SYNC.saving = true;
+  const sent = cloneValue(STATE);
   try{
-    await window.storage.set(caseStorageKey(), JSON.stringify(STATE), false);
+    const res = await window.storage.set(caseStorageKey(), JSON.stringify(sent), {baseRevision: SYNC.revision ?? undefined});
+    const remote = normalizeClientState(JSON.parse(res.value));
+    // Takes over server-side normalization (scores, invalid ticks removed)
+    // for everything not edited again while the request was running.
+    adoptRemoteState(sent, remote);
+    SYNC.base = remote;
+    SYNC.revision = res.revision;
     saveCaseSummary();
-    document.getElementById('saveState').textContent = 'Automatisch gespeichert · ' + new Date().toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('saveState').textContent = 'Automatisch gespeichert · ' + syncTime();
   }catch(err){
-    document.getElementById('saveState').textContent = 'Speichern fehlgeschlagen — bitte Eingaben notieren';
-    console.error('Storage error', err);
+    if (err.status === 409){
+      try{
+        const { localEdits } = await pullRemoteState(true);
+        SYNC.resave = SYNC.resave || localEdits;
+        document.getElementById('saveState').textContent = 'Mit Änderungen eines anderen Arbeitsplatzes zusammengeführt · ' + syncTime();
+      }catch(pullErr){
+        document.getElementById('saveState').textContent = 'Speichern fehlgeschlagen — bitte Eingaben notieren';
+        console.error('Storage error', pullErr);
+      }
+    }else{
+      document.getElementById('saveState').textContent = 'Speichern fehlgeschlagen — bitte Eingaben notieren';
+      console.error('Storage error', err);
+    }
+  }finally{
+    SYNC.saving = false;
+    if (SYNC.resave){
+      SYNC.resave = false;
+      saveState();
+    }
   }
 }
 
@@ -986,7 +1184,9 @@ async function loadState(){
     const res = await window.storage.get(caseStorageKey(), false);
     if (res && res.value){
       const parsed = JSON.parse(res.value);
-      STATE = Object.assign({ patientName:"", opDate:"", checked:{}, openBlocks:{}, answers:{}, notes:{}, labs:[], suchtmittel:[] }, parsed);
+      STATE = Object.assign(emptyState(), parsed);
+      SYNC.base = normalizeClientState(parsed);
+      SYNC.revision = res.revision;
     }
   }catch(err){
     // no saved state yet — start fresh
@@ -1011,4 +1211,5 @@ async function loadState(){
   updateFlags();
   document.getElementById('saveState').textContent = 'Bereit';
   renderWorklist();
+  startLiveSync();
 }

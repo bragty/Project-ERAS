@@ -5,7 +5,7 @@ from apps.core.api import ApiError, error_response, ok, parse_json_body
 from apps.patients.selectors import treatment_case_by_number
 
 from ..serializers import checklist_state_to_dict
-from ..services import get_state, reset_state, save_state
+from ..services import get_revision, get_state, reset_state, save_state
 
 
 def _case_or_404(case_number):
@@ -29,6 +29,19 @@ def case_state(request, case_number):
         raw_state = body.get("state", body)
         if not isinstance(raw_state, dict):
             raise ApiError("state muss ein JSON-Objekt sein.", code="validation_error")
-        return ok(checklist_state_to_dict(*save_state(treatment_case, raw_state)))
+        base_revision = body.get("baseRevision")
+        if base_revision is not None and (isinstance(base_revision, bool) or not isinstance(base_revision, int)):
+            raise ApiError("baseRevision muss eine Ganzzahl sein.", code="validation_error")
+        return ok(checklist_state_to_dict(*save_state(treatment_case, raw_state, base_revision)))
+    except ApiError as exc:
+        return error_response(exc)
+
+
+@require_http_methods(["GET"])
+def case_state_revision(request, case_number):
+    try:
+        treatment_case = _case_or_404(case_number)
+        revision, updated_at = get_revision(treatment_case)
+        return ok({"revision": revision, "savedAt": updated_at.isoformat() if updated_at else None})
     except ApiError as exc:
         return error_response(exc)
