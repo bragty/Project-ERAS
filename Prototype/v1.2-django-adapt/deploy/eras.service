@@ -1,0 +1,43 @@
+# systemd unit for the ERAS backend (Gunicorn) on a Linux server (Ubuntu/Debian).
+#
+# Installation:
+#   sudo cp deploy/eras.service /etc/systemd/system/eras.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now eras
+#   journalctl -u eras -f          # Logs ansehen
+
+[Unit]
+Description=ERAS Django backend (Gunicorn)
+After=network.target
+# ANPASSEN (Hosting): einkommentieren, wenn PostgreSQL auf demselben Server läuft.
+# After=network.target postgresql.service
+
+[Service]
+Type=notify
+NotifyAccess=main
+# ANPASSEN (Hosting): eigener, nicht privilegierter Service-User ohne Login-Shell,
+# z. B. "sudo useradd --system --home /opt/eras --shell /usr/sbin/nologin eras".
+User=eras
+Group=eras
+# ANPASSEN (Hosting): Installationspfad des Projekts.
+WorkingDirectory=/opt/eras/app
+# ANPASSEN (Hosting): .env mit den Produktionswerten (chmod 600, Besitzer eras).
+EnvironmentFile=/opt/eras/app/.env
+ExecStart=/opt/eras/app/.venv/bin/gunicorn -c deploy/gunicorn.conf.py eras_project.wsgi:application
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+
+# Hardening: the service can only write to the database/static directories.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# ANPASSEN (Hosting): Datenordner der SQLite-Datenbank (SQLITE_PATH in .env).
+# Der ganze Ordner muss beschreibbar sein, weil SQLite daneben WAL-Dateien anlegt:
+#   sudo install -d -o eras -g eras -m 700 /opt/eras/data
+# Mit PostgreSQL kann die Zeile entfallen (collectstatic läuft beim Deployment).
+ReadWritePaths=/opt/eras/data
+
+[Install]
+WantedBy=multi-user.target

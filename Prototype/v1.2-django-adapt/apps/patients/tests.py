@@ -56,6 +56,43 @@ class PatientApiTests(TestCase):
         self.assertEqual(len(response.json()["results"]), 1)
         self.assertEqual(response.json()["results"][0]["caseNumber"], "F-99999")
 
-    def test_admin_is_not_configured(self):
+    def test_admin_requires_login(self):
         response = self.client.get("/admin/")
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin/login/", response["Location"])
+
+    def test_admin_pages_render_for_superuser(self):
+        from django.contrib.auth import get_user_model
+
+        self.create_case()
+        case = TreatmentCase.objects.get(case_number="F-78342")
+        admin_user = get_user_model().objects.create_superuser("admin", "admin@example.com", "pw")
+        self.client.force_login(admin_user)
+        for url in (
+            "/admin/",
+            "/admin/patients/patient/",
+            f"/admin/patients/patient/{case.patient.pk}/change/",
+            "/admin/patients/treatmentcase/",
+            f"/admin/patients/treatmentcase/{case.pk}/change/",
+            "/admin/responses/checkliststate/",
+            f"/admin/responses/checkliststate/{case.checklist_state.pk}/change/",
+            "/admin/audit/auditevent/",
+        ):
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_admin_archive_action_refuses_incomplete_case(self):
+        from django.contrib.auth import get_user_model
+
+        self.create_case()
+        case = TreatmentCase.objects.get(case_number="F-78342")
+        admin_user = get_user_model().objects.create_superuser("admin", "admin@example.com", "pw")
+        self.client.force_login(admin_user)
+        response = self.client.post(
+            "/admin/patients/treatmentcase/",
+            {"action": "archive_selected", "_selected_action": [case.pk]},
+            follow=True,
+        )
+        self.assertContains(response, "Nicht archiviert")
+        case.refresh_from_db()
+        self.assertFalse(case.archived)

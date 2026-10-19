@@ -30,7 +30,7 @@ class ParserTests(unittest.TestCase):
             self.assertIsNone(match_lab_label(text),text)
 
     def test_frontend_catalog_matches_backend(self):
-        source=(Path(__file__).resolve().parents[3]/"eras/static/eras/js/checklist.js").read_text()
+        source=(Path(__file__).resolve().parents[3]/"eras/static/eras/js/checklist.js").read_text(encoding="utf-8")
         options=json.loads(re.search(r"const LAB_OPTIONS = (\[.*?\]);",source,re.S).group(1))
         self.assertEqual(options,[x["label"] for x in LAB_CATALOG])
 

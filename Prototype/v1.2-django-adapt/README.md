@@ -1,11 +1,4 @@
-# ERAS Django Prototype – Backend integriert, ohne Login
-
-Diese Version basiert auf dem hochgeladenen Stand `Project-ERAS-frontend_thiago`.
-Das bestehende Frontend-Design (HTML/CSS) wurde **nicht verändert**. Nur die
-JavaScript-Datenzugriffe wurden dort angepasst, wo die Oberfläche mit dem neuen
-Django-Backend kommunizieren muss.
-
-## Was jetzt serverseitig ist
+## Serverseitig
 
 - Patienten und Behandlungsfälle werden in der Django-Datenbank gespeichert.
 - Die Patientenübersicht lädt/sucht Fälle über eine REST-artige JSON-API.
@@ -22,18 +15,43 @@ Django-Backend kommunizieren muss.
 
 ## Bewusst nicht vorhanden
 
-Das Projekt hat entsprechend dem Projektentscheid **kein Login- und kein User-System**:
+Die klinische Oberfläche (Patientenübersicht, Checkliste) und die API haben
+entsprechend dem Projektentscheid **kein Login- und kein User-System**:
 
 - keine eigene `accounts`-App
-- kein Login/Logout
-- keine Rollen/Berechtigungen
-- kein Django Admin
-- keine `django.contrib.auth`, Sessions oder Messages
+- kein Login/Logout im Frontend
+- keine Rollen/Berechtigungen im Frontend/API
 - keine User-Foreign-Keys in Antworten/Audit
 
 Wichtig: Weil keine Benutzeridentifikation existiert, kann der Audit-Trail nur
 festhalten **was** und **wann** geändert wurde, aber nicht **wer** die Änderung
 vorgenommen hat.
+
+Ausnahme: Das **Django-Admin** (Backoffice) ist eingebunden und verwendet dafür
+`django.contrib.auth`, Sessions und Messages. Es ist nur mit Admin-Konto
+erreichbar; siehe Abschnitt [Django-Admin](#django-admin-backoffice).
+
+## Django-Admin (Backoffice)
+
+Erreichbar unter `http://127.0.0.1:8000/admin/` (Pfad über `DJANGO_ADMIN_URL`
+änderbar). Einmalig ein Konto anlegen:
+
+```bash
+python manage.py migrate
+python manage.py createsuperuser
+```
+
+| Bereich | Möglich | Bewusst nicht möglich |
+|---|---|---|
+| Patienten | suchen, Stammdaten korrigieren, Fälle des Patienten sehen | – |
+| Behandlungsfälle | filtern/suchen, Stammdaten korrigieren, neu anlegen, archivieren/wiederherstellen (Aktion) | Archivieren mit unvollständiger Checkliste |
+| Checklistenstände | Fortschritt, Revision, Validierungsfehler und JSON-Zustand ansehen | Antworten bearbeiten (nur über die App, damit Validierung/Revision/Audit greifen) |
+| Audit-Events | filtern, suchen, Metadaten ansehen | ändern, löschen |
+| Benutzer/Gruppen | Admin-Konten und Rechte verwalten | – |
+
+Änderungen an Fällen über das Admin erzeugen `AuditEvent`s
+(`case_created_admin`, `case_updated_admin`); zusätzlich führt Django ein eigenes
+Admin-Protokoll mit Benutzername („Letzte Aktionen“ / Verlauf pro Objekt).
 
 ## Architektur
 
@@ -54,7 +72,7 @@ Django API Views
 Django ORM
         |
         v
-SQLite (lokal) oder PostgreSQL (per Umgebungsvariablen)
+SQLite (Standard) oder optional PostgreSQL (per Umgebungsvariablen)
 ```
 
 ## Backend-Struktur
@@ -119,14 +137,35 @@ Dann:
 - Patientenübersicht: `http://127.0.0.1:8000/`
 - Checkliste: `http://127.0.0.1:8000/checklist/`
 - Healthcheck: `http://127.0.0.1:8000/api/health/`
+- Django-Admin: `http://127.0.0.1:8000/admin/` (vorher `python manage.py createsuperuser`)
 
 ## Datenbank
 
-Ohne weitere Konfiguration wird SQLite (`db.sqlite3`) verwendet.
+Standard ist **SQLite**, lokal wie in Produktion. Die Datenbank ist eine einzelne
+Datei; ein eigener DB-Server ist nicht nötig.
 
-Für PostgreSQL werden die Umgebungsvariablen `POSTGRES_DB`, `POSTGRES_USER`,
-`POSTGRES_PASSWORD`, `POSTGRES_HOST` und `POSTGRES_PORT` verwendet. Sobald
-`POSTGRES_DB` gesetzt ist, wechselt Django automatisch auf PostgreSQL.
+- Pfad: `SQLITE_PATH` (ohne Wert `db.sqlite3` im Projektordner). In Produktion
+  einen eigenen Datenordner verwenden, z. B. `/opt/eras/data/db.sqlite3`. Der
+  App-User braucht Schreibrechte auf den **Ordner**, weil SQLite daneben
+  `-wal`/`-shm`-Dateien anlegt.
+- Für mehrere Gunicorn-Worker ist SQLite auf WAL-Modus, Lock-Wartezeit
+  (`SQLITE_TIMEOUT_SECONDS`, Standard 20 s) und `IMMEDIATE`-Transaktionen
+  eingestellt. Das reicht für eine Station bzw. Klinik mit einem App-Server.
+  Die Datei muss auf einer lokalen Platte liegen, nicht auf einem Netzlaufwerk
+  (NFS/SMB).
+- Backup im laufenden Betrieb (konsistente Kopie trotz WAL):
+
+  ```bash
+  sqlite3 /opt/eras/data/db.sqlite3 ".backup '/backup/eras-$(date +%F).sqlite3'"
+  ```
+
+**PostgreSQL (optional):** z. B. für eine Klinik mit vorhandener
+DB-Infrastruktur oder mehreren App-Servern. Dafür `POSTGRES_DB`, `POSTGRES_USER`,
+`POSTGRES_PASSWORD`, `POSTGRES_HOST` und `POSTGRES_PORT` setzen und
+`python manage.py migrate` ausführen. Sobald `POSTGRES_DB` gesetzt ist, wechselt
+Django automatisch auf PostgreSQL; `SQLITE_PATH` wird dann ignoriert. Der
+Treiber (`psycopg`) ist bereits in `requirements.txt` enthalten. Bestehende Daten
+lassen sich bei Bedarf mit `dumpdata`/`loaddata` übertragen.
 
 ## Nach `git pull` auf der VM
 
@@ -135,11 +174,64 @@ cd /pfad/zum/projekt
 source .venv/bin/activate
 pip install -r requirements.txt
 python manage.py migrate
+python manage.py collectstatic --noinput
 sudo systemctl restart eras
 ```
 
 Nginx und systemd müssen für diese Codeänderung nicht neu entworfen werden; sie
-können weiterhin auf Django unter `127.0.0.1:8000` zeigen.
+können weiterhin auf Django unter `127.0.0.1:8000` zeigen. Statische Dateien
+(CSS/JS, Admin-Design) liefert Django selbst über WhiteNoise aus; bei
+`DJANGO_DEBUG=false` muss dafür vorher `collectstatic` gelaufen sein.
+
+## Produktivbetrieb (Spital-IT)
+
+Die Konfiguration erfolgt ausschliesslich über Umgebungsvariablen (Vorlage:
+`.env.example`). Mit `DJANGO_ENV=production` gilt ein strenges Profil:
+
+- Start bricht ab, wenn `DJANGO_SECRET_KEY` oder `DJANGO_ALLOWED_HOSTS` fehlen
+  bzw. `DJANGO_DEBUG=true` gesetzt ist.
+- Datenbank: SQLite unter `SQLITE_PATH`, optional PostgreSQL (siehe
+  [Datenbank](#datenbank)).
+- HTTPS-Härtung aktiv: Redirect auf HTTPS, sichere Cookies, HSTS, Proxy-Header.
+- Statische Dateien mit Hash im Namen und langem Caching (WhiteNoise).
+- Admin-Passwörter mind. 12 Zeichen, Admin-Sessions laufen nach 8 h ab.
+
+Alle Stellen, die je nach Hosting angepasst werden müssen, sind im Code mit
+`ANPASSEN (Hosting)` markiert:
+
+```bash
+grep -rn "ANPASSEN (Hosting)" --exclude-dir=.venv .
+```
+
+| Datei | Zweck |
+|---|---|
+| `eras_project/settings.py` | Profile, Sicherheit, DB, Logging |
+| `.env.example` | alle Umgebungsvariablen |
+| `deploy/gunicorn.conf.py` | Applikationsserver |
+| `deploy/eras.service` | systemd-Dienst (klassischer Linux-Server) |
+| `deploy/nginx-eras.conf` | Reverse-Proxy mit TLS, Upload-Limit, Admin-IP-Sperre |
+| `Dockerfile`, `.dockerignore` | Container-Variante (Docker/Podman/Kubernetes) |
+
+Deployment-Schritte pro Release:
+
+```bash
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py collectstatic --noinput
+python manage.py check --deploy     # nur HSTS-Subdomain/Preload-Warnungen sind ok
+sudo systemctl restart eras          # bzw. Container neu ausrollen
+```
+
+Vor dem Einsatz mit echten Patientendaten mit der Spital-IT klären:
+
+1. **Authentifizierung für Frontend und API** (z. B. SSO über den Proxy) – aktuell
+   sind diese ohne Login erreichbar. Das ist der wichtigste offene Punkt.
+2. Hostname, TLS-Zertifikat und ob TLS am Proxy/Load-Balancer endet.
+3. Ablageort der SQLite-Datei (bzw. PostgreSQL-Instanz), Backup- und
+   Restore-Konzept, Aufbewahrungsfristen.
+4. Netzbereiche, aus denen das Admin erreichbar sein darf.
+5. Zentrales Logging/Monitoring (Healthcheck: `/api/health/`).
+6. Tesseract-Installation auf dem Server (im Dockerfile bereits enthalten).
 
 ## Tests
 
@@ -152,15 +244,9 @@ node --test eras/meeting.test.cjs
 
 ## Wichtige Hinweise
 
-1. Bestehende Patientendaten aus `localStorage` werden nicht automatisch migriert.
-   Ab dieser Version sind neu erfasste Patienten und fallbezogene Checklisten in
-   der Serverdatenbank die maßgebliche Quelle.
-2. Eine Checkliste ist immer einem Behandlungsfall zugeordnet. `/checklist/`
-   ohne `?case=...` wird deshalb auf die Patientenübersicht zurückgeleitet;
-   es gibt keine fallbezogene Speicherung mehr in `localStorage`.
-3. Der öffentliche Prototyp sollte ohne Login ausschließlich mit fiktiven bzw.
+1. Der öffentliche Prototyp sollte ohne Login ausschließlich mit fiktiven bzw.
    freigegebenen Testdaten betrieben werden.
-4. Die Checklistenstruktur wird im bestehenden Frontend weiterhin gerendert; das
+2. Die Checklistenstruktur wird im bestehenden Frontend weiterhin gerendert; das
    Backend spiegelt die aktuelle Version für Validierung und Progress wider.
    Wenn Fragen strukturell geändert werden, müssen Frontend-Schema und
    `apps/checklist/schema.py` gemeinsam versioniert werden.
@@ -284,6 +370,20 @@ LAB_IMPORT_OCR_LANG=deu+eng
   Deshalb ist aktuell auch keine benutzerbezogene Berechtigungsprüfung möglich.
   Für einen produktiven klinischen Einsatz muss Authentifizierung/Autorisierung
   ergänzt werden; CSRF und Fallkontext ersetzen diese nicht.
+
+### Live-Aktualisierung bei mehreren Arbeitsplätzen
+
+- neuer Endpoint `GET /api/cases/<fallnummer>/state/revision/` (leichtgewichtig, nur Revision + Zeitpunkt)
+- `PUT /api/cases/<fallnummer>/state/` akzeptiert optional `baseRevision`; ist der Fall
+  zwischenzeitlich anderswo gespeichert worden, antwortet das Backend mit `409 revision_conflict`
+  statt die fremden Änderungen zu überschreiben (ohne `baseRevision` unverändertes Verhalten)
+- `checklist.js`: offene Checklisten fragen alle 3 s die Revision ab und übernehmen neuere
+  Serverstände per Drei-Wege-Merge feldweise; noch nicht gespeicherte lokale Eingaben bleiben
+  erhalten, Fokus, Cursor, Scrollposition und geöffnete Notizen/Zuweisungen ebenfalls.
+  Auf- und zugeklappte Blöcke (`openBlocks`) bleiben pro Arbeitsplatz lokal.
+- `frontpage.js`: Patientenübersicht aktualisiert sich alle 5 s (nur bei Änderungen neu gerendert)
+- Polling pausiert in Hintergrund-Tabs und läuft beim Zurückwechseln sofort an.
+  Keine zusätzliche Infrastruktur (WebSockets/Redis) nötig; Nginx/systemd bleiben unverändert.
 
 ### Wichtige Einschränkung
 

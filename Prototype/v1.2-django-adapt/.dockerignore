@@ -1,0 +1,13 @@
+.env
+.git
+.idea
+.venv
+venv
+__pycache__/
+*.py[cod]
+db.sqlite3
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+staticfiles/
+node_modules/

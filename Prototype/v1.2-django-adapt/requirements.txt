@@ -1,6 +1,9 @@
-Django>=5.0,<6.0
+Django>=5.1,<6.0
 psycopg[binary]>=3.1,<4.0
 pdfplumber>=0.11,<1.0
 Pillow>=10.0,<13.0
 pytesseract>=0.3.10,<0.4
 pypdfium2>=4.30,<6.0
+whitenoise>=6.6,<7.0
+# Production application server (Linux only; locally "manage.py runserver" is used).
+gunicorn>=22.0,<24.0; sys_platform != "win32"

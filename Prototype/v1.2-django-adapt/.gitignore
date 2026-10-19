@@ -1,4 +1,9 @@
+# SQLite-Datenbank inkl. WAL-/Journal-Dateien (enthält Patientendaten)
 db.sqlite3
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+*.sqlite3-journal
 
 # PyCharm
 .idea/
@@ -10,3 +15,9 @@ __pycache__/
 # Virtual Environment
 .venv/
 venv/
+
+# Secrets / Build-Artefakte
+.env
+.env.*
+!.env.example
+staticfiles/
