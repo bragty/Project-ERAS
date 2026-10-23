@@ -1,0 +1,1834 @@
+{
+  "schemaVersion": 3,
+  "fields": {
+    "amb_ileum_uk_entfernung": {
+      "label": "Entfernung UK (Datum)",
+      "type": "date"
+    },
+    "amb_neoblase_rehosp_datum": {
+      "label": "Re-Hospitalisation (Datum)",
+      "type": "date"
+    },
+    "amb_stoma_termin": {
+      "label": "Termin-Datum",
+      "type": "date"
+    },
+    "anaesthesie_termin": {
+      "label": "Termin-Datum",
+      "type": "date"
+    },
+    "epworth_0": {
+      "label": "Beim Sitzen oder Lesen",
+      "type": "select",
+      "options": [
+        {
+          "value": "0",
+          "label": "0 – Würde niemals einnicken"
+        },
+        {
+          "value": "1",
+          "label": "1 – Geringe Wahrscheinlichkeit einzunicken"
+        },
+        {
+          "value": "2",
+          "label": "2 – Mittlere Wahrscheinlichkeit einzunicken"
+        },
+        {
+          "value": "3",
+          "label": "3 – Hohe Wahrscheinlichkeit einzunicken"
+        }
+      ]
+    },
+    "epworth_1": {
+      "label": "Vor dem Fernseher",
+      "type": "select",
+      "options": [
+        {
+          "value": "0",
+          "label": "0 – Würde niemals einnicken"
+        },
+        {
+          "value": "1",
+          "label": "1 – Geringe Wahrscheinlichkeit einzunicken"
+        },
+        {
+          "value": "2",
+          "label": "2 – Mittlere Wahrscheinlichkeit einzunicken"
+        },
+        {
+          "value": "3",
+          "label": "3 – Hohe Wahrscheinlichkeit einzunicken"
+        }
+      ]
+    },
+    "epworth_2": {
+      "label": "Im Kino oder Theater",
+      "type": "select",
+      "options": [
+        {
+          "value": "0",
+          "label": "0 – Würde niemals einnicken"
+        },
+        {
+          "value": "1",
+          "label": "1 – Geringe Wahrscheinlichkeit einzunicken"
+        },
+        {
+          "value": "2",
+          "label": "2 – Mittlere Wahrscheinlichkeit einzunicken"
+        },
+        {
+          "value": "3",
+          "label": "3 – Hohe Wahrscheinlichkeit einzunicken"
+        }
+      ]
+    },
+    "epworth_3": {
+      "label": "Als Beifahrer im Auto",
+      "type": "select",
+      "options": [
+        {
+          "value": "0",
+          "label": "0 – Würde niemals einnicken"
+        },
+        {
+          "value": "1",
+          "label": "1 – Geringe Wahrscheinlichkeit einzunicken"
+        },
+        {
+          "value": "2",
+          "label": "2 – Mittlere Wahrscheinlichkeit einzunicken"
+        },
+        {
+          "value": "3",
+          "label": "3 – Hohe Wahrscheinlichkeit einzunicken"
+        }
+      ]
+    },
+    "epworth_4": {
+      "label": "Beim Hinlegen mittags",
+      "type": "select",
+      "options": [
+        {
+          "value": "0",
+          "label": "0 – Würde niemals einnicken"
+        },
+        {
+          "value": "1",
+          "label": "1 – Geringe Wahrscheinlichkeit einzunicken"
+        },
+        {
+          "value": "2",
+          "label": "2 – Mittlere Wahrscheinlichkeit einzunicken"
+        },
+        {
+          "value": "3",
+          "label": "3 – Hohe Wahrscheinlichkeit einzunicken"
+        }
+      ]
+    },
+    "epworth_5": {
+      "label": "Im Gespräch",
+      "type": "select",
+      "options": [
+        {
+          "value": "0",
+          "label": "0 – Würde niemals einnicken"
+        },
+        {
+          "value": "1",
+          "label": "1 – Geringe Wahrscheinlichkeit einzunicken"
+        },
+        {
+          "value": "2",
+          "label": "2 – Mittlere Wahrscheinlichkeit einzunicken"
+        },
+        {
+          "value": "3",
+          "label": "3 – Hohe Wahrscheinlichkeit einzunicken"
+        }
+      ]
+    },
+    "epworth_6": {
+      "label": "Im Sitzen nach dem Essen",
+      "type": "select",
+      "options": [
+        {
+          "value": "0",
+          "label": "0 – Würde niemals einnicken"
+        },
+        {
+          "value": "1",
+          "label": "1 – Geringe Wahrscheinlichkeit einzunicken"
+        },
+        {
+          "value": "2",
+          "label": "2 – Mittlere Wahrscheinlichkeit einzunicken"
+        },
+        {
+          "value": "3",
+          "label": "3 – Hohe Wahrscheinlichkeit einzunicken"
+        }
+      ]
+    },
+    "epworth_7": {
+      "label": "Im Auto vor dem Rotlicht",
+      "type": "select",
+      "options": [
+        {
+          "value": "0",
+          "label": "0 – Würde niemals einnicken"
+        },
+        {
+          "value": "1",
+          "label": "1 – Geringe Wahrscheinlichkeit einzunicken"
+        },
+        {
+          "value": "2",
+          "label": "2 – Mittlere Wahrscheinlichkeit einzunicken"
+        },
+        {
+          "value": "3",
+          "label": "3 – Hohe Wahrscheinlichkeit einzunicken"
+        }
+      ]
+    },
+    "ernaehrung_termin": {
+      "label": "Termin vereinbart am",
+      "type": "date"
+    },
+    "g8_age": {
+      "label": "Alter",
+      "type": "select",
+      "options": [
+        {
+          "value": "0",
+          "label": "0 – Über 85 Jahre"
+        },
+        {
+          "value": "1",
+          "label": "1 – 80 bis 85 Jahre"
+        },
+        {
+          "value": "2",
+          "label": "2 – Unter 80 Jahre"
+        }
+      ]
+    },
+    "g8_bmi": {
+      "label": "Body-Mass-Index (Gewicht in kg / Grösse in m²)",
+      "type": "select",
+      "options": [
+        {
+          "value": "0",
+          "label": "0 – BMI <19"
+        },
+        {
+          "value": "1",
+          "label": "1 – BMI 19 bis unter 21"
+        },
+        {
+          "value": "2",
+          "label": "2 – BMI 21 bis unter 23"
+        },
+        {
+          "value": "3",
+          "label": "3 – BMI ≥23"
+        }
+      ]
+    },
+    "g8_food": {
+      "label": "Hat die Nahrungsaufnahme in den letzten 3 Monaten wegen Appetitverlust, Verdauungsproblemen, Kau- oder Schluckstörungen abgenommen?",
+      "type": "select",
+      "options": [
+        {
+          "value": "0",
+          "label": "0 – Schwere Einschränkung der Nahrungsaufnahme"
+        },
+        {
+          "value": "1",
+          "label": "1 – Mässige Einschränkung der Nahrungsaufnahme"
+        },
+        {
+          "value": "2",
+          "label": "2 – Normale Nahrungsaufnahme"
+        }
+      ]
+    },
+    "g8_health": {
+      "label": "Verglichen mit Gleichaltrigen: Wie schätzt der Patient seinen Zustand ein?",
+      "type": "select",
+      "options": [
+        {
+          "value": "0",
+          "label": "0 – Nicht so gut"
+        },
+        {
+          "value": "0.5",
+          "label": "0.5 – Weiss nicht"
+        },
+        {
+          "value": "1",
+          "label": "1 – Gleich gut"
+        },
+        {
+          "value": "2",
+          "label": "2 – Besser"
+        }
+      ]
+    },
+    "g8_medication": {
+      "label": "Nimmt mehr als 3 Medikamente pro Tag ein?",
+      "type": "select",
+      "options": [
+        {
+          "value": "0",
+          "label": "0 – Ja"
+        },
+        {
+          "value": "1",
+          "label": "1 – Nein"
+        }
+      ]
+    },
+    "g8_mobility": {
+      "label": "Mobilität",
+      "type": "select",
+      "options": [
+        {
+          "value": "0",
+          "label": "0 – Bett oder Stuhl"
+        },
+        {
+          "value": "1",
+          "label": "1 – Kann aus Bett/Stuhl aufstehen, geht aber nicht nach draussen"
+        },
+        {
+          "value": "2",
+          "label": "2 – Geht nach draussen"
+        }
+      ]
+    },
+    "g8_neuro": {
+      "label": "Neuropsychologische Probleme?",
+      "type": "select",
+      "options": [
+        {
+          "value": "0",
+          "label": "0 – Schwere Demenz oder Depression"
+        },
+        {
+          "value": "1",
+          "label": "1 – Milde Demenz oder Depression"
+        },
+        {
+          "value": "2",
+          "label": "2 – Keine psychischen Probleme"
+        }
+      ]
+    },
+    "g8_weight": {
+      "label": "Gewichtsverlust in den letzten 3 Monaten?",
+      "type": "select",
+      "options": [
+        {
+          "value": "0",
+          "label": "0 – Gewichtsverlust >3 kg"
+        },
+        {
+          "value": "1",
+          "label": "1 – Unbekannt"
+        },
+        {
+          "value": "2",
+          "label": "2 – Gewichtsverlust zwischen 1 und 3 kg"
+        },
+        {
+          "value": "3",
+          "label": "3 – Kein Gewichtsverlust"
+        }
+      ]
+    },
+    "g8_zuweisung": {
+      "label": "Zuweisung Geriatrie",
+      "type": "select",
+      "options": [
+        "Ja",
+        "Nein"
+      ]
+    },
+    "kardio_ef": {
+      "label": "EF (%)",
+      "type": "number",
+      "min": 0,
+      "max": 100
+    },
+    "onko_behandler": {
+      "label": "Zuständige/r Onkologe/in",
+      "type": "text"
+    },
+    "onko_chemo": {
+      "label": "Periop. Chemoimmuntherapie geplant?",
+      "type": "select",
+      "options": [
+        "Ja",
+        "Nein"
+      ]
+    },
+    "onko_folgetermin_datum": {
+      "label": "Termin-Datum",
+      "type": "date"
+    },
+    "onko_tumorboard_datum": {
+      "label": "Tumorboard-Datum",
+      "type": "date"
+    },
+    "operateur_termin_datum": {
+      "label": "Termin-Datum",
+      "type": "date"
+    },
+    "operateur_termin_status": {
+      "label": "Termin vorhanden?",
+      "type": "select",
+      "options": [
+        "Ja",
+        "Nein"
+      ]
+    },
+    "pbm_ansprechperson": {
+      "optional": true,
+      "label": "Ansprechperson / Notiz",
+      "type": "text"
+    },
+    "pbm_status": {
+      "label": "Status",
+      "type": "select",
+      "options": [
+        "Noch zu prüfen",
+        "Eingeleitet",
+        "Nicht notwendig"
+      ]
+    },
+    "physio_neoblase": {
+      "label": "Neoblase geplant?",
+      "type": "select",
+      "options": [
+        "Ja",
+        "Nein"
+      ]
+    },
+    "physio_pathway_praeop": {
+      "label": "Gewählt",
+      "type": "select",
+      "options": [
+        "Vita-Reha (Serie)",
+        "Einmalige Konsultation"
+      ]
+    },
+    "physio_rehakur": {
+      "label": "Reha/Kur bereits geplant?",
+      "type": "select",
+      "options": [
+        "Ja",
+        "Nein",
+        "Noch offen"
+      ]
+    },
+    "pneumo_grunderkrankung": {
+      "label": "Grunderkrankung",
+      "type": "select",
+      "options": [
+        "Keine",
+        "COPD",
+        "Asthma",
+        "Lungenfibrose/restriktive Lungenfunktion",
+        "Neuromuskuläre Erkrankung/Tetraplegie"
+      ]
+    },
+    "pneumo_letzte_kontrolle": {
+      "label": "Letzte Kontrolle Pneumologie",
+      "type": "date"
+    },
+    "pneumo_niv": {
+      "label": "Bekanntes (O)SAS mit NIV-Therapie?",
+      "type": "select",
+      "options": [
+        "Ja",
+        "Nein"
+      ]
+    },
+    "pneumo_verschlechterung": {
+      "label": "Verschlechterung?",
+      "type": "select",
+      "options": [
+        "Ja",
+        "Nein"
+      ]
+    },
+    "postop_wahl": {
+      "label": "Gewählte Nachsorge",
+      "type": "select",
+      "options": [
+        "Reha",
+        "Kur",
+        "Nach Hause mit Spitex"
+      ]
+    },
+    "raucher_menge": {
+      "label": "Zigaretten/Tag",
+      "type": "number",
+      "min": 0
+    },
+    "raucher_py": {
+      "label": "Pack Years",
+      "type": "number",
+      "min": 0,
+      "step": "0.1"
+    },
+    "raucher_sistiert_seit": {
+      "label": "Sistiert seit (MM/JJJJ)",
+      "type": "text",
+      "placeholder": "MM/JJJJ"
+    },
+    "raucher_status": {
+      "label": "Status",
+      "type": "select",
+      "options": [
+        "Nieraucher",
+        "Ex-Raucher, sistiert >1 Jahr",
+        "Ex-Raucher, sistiert <1 Jahr",
+        "Aktiver Raucher"
+      ]
+    },
+    "score_ecog": {
+      "label": "ECOG Performance Status",
+      "type": "select",
+      "options": [
+        {
+          "value": "0",
+          "label": "0 – Keine Beschwerden, keine Zeichen der Krankheit; normale Aktivität ohne oder mit geringen Symptomen"
+        },
+        {
+          "value": "1",
+          "label": "1 – Normale Aktivität mit Anstrengung möglich; deutliche Symptome; selbständig, aber keine normale Aktivität oder Arbeit"
+        },
+        {
+          "value": "2",
+          "label": "2 – Einige Hilfestellung nötig; grösstenteils selbständig; Hilfe und medizinische Versorgung werden oft in Anspruch genommen"
+        },
+        {
+          "value": "3",
+          "label": "3 – Behindert; qualifizierte Hilfe benötigt; schwerbehindert, Hospitalisation erforderlich"
+        },
+        {
+          "value": "4",
+          "label": "4 – Schwerkrank; intensive medizinische Massnahmen erforderlich; moribund, unaufhaltsamer Verlauf"
+        },
+        {
+          "value": "5",
+          "label": "5 – Verstorben"
+        }
+      ]
+    },
+    "score_epworth": {
+      "label": "Gesamtpunktzahl (automatisch, 0–24)",
+      "type": "number",
+      "min": 0,
+      "max": 24,
+      "readonly": true,
+      "step": "1"
+    },
+    "score_g8": {
+      "label": "Gesamtpunktzahl (automatisch, 0–17)",
+      "type": "number",
+      "min": 0,
+      "max": 17,
+      "readonly": true,
+      "step": "0.5"
+    },
+    "score_mmrc": {
+      "label": "mMRC-Grad",
+      "type": "select",
+      "options": [
+        {
+          "value": "0",
+          "label": "0 – Atemnot nur bei starker Anstrengung"
+        },
+        {
+          "value": "1",
+          "label": "1 – Atemnot beim schnellen Gehen oder beim Bergaufgehen mit leichter Steigung"
+        },
+        {
+          "value": "2",
+          "label": "2 – Langsameres Gehen als Gleichaltrige in der Ebene wegen Atemnot oder notwendige Pausen bei selbstgewählter Geschwindigkeit"
+        },
+        {
+          "value": "3",
+          "label": "3 – Pause wegen Atemnot beim Gehen in der Ebene nach knapp 100 m oder nach einigen Minuten notwendig"
+        },
+        {
+          "value": "4",
+          "label": "4 – Zu kurzatmig, um das Haus zu verlassen, oder Atemnot beim An- und Ausziehen"
+        }
+      ]
+    },
+    "score_nrs": {
+      "label": "NRS-Score (0–7)",
+      "type": "number",
+      "min": 0,
+      "max": 7
+    },
+    "score_stopbang": {
+      "label": "Gesamtpunktzahl (automatisch, 0–8)",
+      "type": "number",
+      "min": 0,
+      "max": 8,
+      "readonly": true,
+      "step": "1"
+    },
+    "stoma_termin": {
+      "label": "Termin-Datum",
+      "type": "date"
+    },
+    "stopbang_age": {
+      "label": "Älter als 50 Jahre?",
+      "type": "select",
+      "options": [
+        {
+          "value": "1",
+          "label": "1 – Ja"
+        },
+        {
+          "value": "0",
+          "label": "0 – Nein"
+        }
+      ]
+    },
+    "stopbang_bmi": {
+      "label": "BMI höher als 35 kg/m²?",
+      "type": "select",
+      "options": [
+        {
+          "value": "1",
+          "label": "1 – Ja"
+        },
+        {
+          "value": "0",
+          "label": "0 – Nein"
+        }
+      ]
+    },
+    "stopbang_neck": {
+      "label": "Halsumfang grösser als 40 cm (bei Frauen) bzw. 43 cm (bei Männern)?",
+      "type": "select",
+      "options": [
+        {
+          "value": "1",
+          "label": "1 – Ja"
+        },
+        {
+          "value": "0",
+          "label": "0 – Nein"
+        }
+      ]
+    },
+    "stopbang_observed": {
+      "label": "Hat jemand beobachtet, dass Sie im Schlaf aufhören zu atmen?",
+      "type": "select",
+      "options": [
+        {
+          "value": "1",
+          "label": "1 – Ja"
+        },
+        {
+          "value": "0",
+          "label": "0 – Nein"
+        }
+      ]
+    },
+    "stopbang_pressure": {
+      "label": "Werden Sie oder wurden Sie wegen hohen Blutdrucks behandelt?",
+      "type": "select",
+      "options": [
+        {
+          "value": "1",
+          "label": "1 – Ja"
+        },
+        {
+          "value": "0",
+          "label": "0 – Nein"
+        }
+      ]
+    },
+    "stopbang_sex": {
+      "label": "Männlich?",
+      "type": "select",
+      "options": [
+        {
+          "value": "1",
+          "label": "1 – Ja"
+        },
+        {
+          "value": "0",
+          "label": "0 – Nein"
+        }
+      ]
+    },
+    "stopbang_snoring": {
+      "label": "Schnarchen Sie laut (lauter als Sprechen oder hörbar durch eine geschlossene Tür)?",
+      "type": "select",
+      "options": [
+        {
+          "value": "1",
+          "label": "1 – Ja"
+        },
+        {
+          "value": "0",
+          "label": "0 – Nein"
+        }
+      ]
+    },
+    "stopbang_tired": {
+      "label": "Fühlen Sie sich häufig müde oder schläfrig tagsüber?",
+      "type": "select",
+      "options": [
+        {
+          "value": "1",
+          "label": "1 – Ja"
+        },
+        {
+          "value": "0",
+          "label": "0 – Nein"
+        }
+      ]
+    },
+    "sucht_alkohol": {
+      "optional": true,
+      "label": "Alkohol – was, wie häufig?",
+      "type": "text"
+    },
+    "thrombo_eGFR": {
+      "optional": true,
+      "label": "eGFR (ml/min), falls relevant",
+      "type": "text"
+    },
+    "thrombo_plan": {
+      "label": "Plan / Verordnung",
+      "type": "text"
+    },
+    "tropo_preop": {
+      "label": "Troponin präOP (ng/L)",
+      "type": "number"
+    },
+    "tropo_tag1": {
+      "label": "Troponin Tag 1 (ng/L)",
+      "type": "number"
+    },
+    "tropo_tag2": {
+      "label": "Troponin Tag 2 (ng/L)",
+      "type": "number"
+    },
+    "urinkultur_datum": {
+      "label": "Geplantes Datum",
+      "type": "date"
+    },
+    "urostoma_entfernung_li": {
+      "label": "Entfernung UK links (Datum)",
+      "type": "date"
+    },
+    "urostoma_entfernung_re": {
+      "label": "Entfernung UK rechts (Datum)",
+      "type": "date"
+    },
+    "vital_gewicht": {
+      "label": "Gewicht (kg)",
+      "type": "number",
+      "min": 0,
+      "step": "0.1"
+    },
+    "vital_groesse": {
+      "label": "Körpergrösse (cm)",
+      "type": "number",
+      "min": 1,
+      "step": "0.1"
+    },
+    "vital_puls": {
+      "label": "Puls (/min)",
+      "type": "number",
+      "min": 0
+    },
+    "vital_rr_dia": {
+      "label": "RR diastolisch (mmHg)",
+      "type": "number",
+      "min": 0
+    },
+    "vital_rr_sys": {
+      "label": "RR systolisch (mmHg)",
+      "type": "number",
+      "min": 0
+    },
+    "vital_spo2": {
+      "label": "SpO2 (%)",
+      "type": "number",
+      "min": 0,
+      "max": 100
+    },
+    "vital_temp": {
+      "label": "Temperatur (C)",
+      "type": "number",
+      "step": "0.1"
+    }
+  },
+  "preop": [
+    {
+      "id": "t1:vitalparameter",
+      "title": "Vitalparameter erfassen",
+      "widget": "bmi",
+      "fields": [
+        "vital_rr_sys",
+        "vital_rr_dia",
+        "vital_puls",
+        "vital_spo2",
+        "vital_temp",
+        "vital_gewicht",
+        "vital_groesse"
+      ]
+    },
+    {
+      "id": "t1:divider:1",
+      "divider": "Fragebögen"
+    },
+    {
+      "id": "t1:fb-g8",
+      "title": "Fragebogen G8 (geriatrisches Screening)",
+      "detail": [
+        "Der Grenzwert für eine automatische Geriatrie-Zuweisung muss laut Sitzungsprotokoll fachlich bestätigt werden. Zuweisungsentscheid vorläufig manuell dokumentieren."
+      ],
+      "fields": [
+        "g8_food",
+        "g8_weight",
+        "g8_mobility",
+        "g8_neuro",
+        "g8_bmi",
+        "g8_medication",
+        "g8_health",
+        "g8_age",
+        "score_g8",
+        "g8_zuweisung"
+      ],
+      "questionnaire": true,
+      "scoring": {
+        "scoreKey": "score_g8",
+        "max": 17,
+        "questions": [
+          "g8_food",
+          "g8_weight",
+          "g8_mobility",
+          "g8_neuro",
+          "g8_bmi",
+          "g8_medication",
+          "g8_health",
+          "g8_age"
+        ]
+      }
+    },
+    {
+      "id": "t1:fb-nrs",
+      "title": "Fragebogen NRS (Nutritional Risk Screening)",
+      "detail": [
+        "Die bereitgestellte Checkliste enthält keinen vollständigen NRS-Fragebogen. Den extern erhobenen NRS-Gesamtwert hier erfassen."
+      ],
+      "fields": [
+        "score_nrs"
+      ],
+      "flagRule": "ernaehrung",
+      "questionnaire": true
+    },
+    {
+      "id": "t1:fb-ecog",
+      "title": "Fragebogen ECOG",
+      "scoreDescription": true,
+      "fields": [
+        "score_ecog"
+      ],
+      "questionnaire": true
+    },
+    {
+      "id": "t1:fb-stopbang",
+      "title": "Fragebogen STOP-BANG",
+      "detail": [
+        "Jede Frage mit Ja oder Nein beantworten. Ab 3 Ja-Antworten ist gemäss BENE-Checkliste die Zuweisung zur OSAS-Abklärung erforderlich."
+      ],
+      "fields": [
+        "stopbang_snoring",
+        "stopbang_tired",
+        "stopbang_observed",
+        "stopbang_pressure",
+        "stopbang_bmi",
+        "stopbang_age",
+        "stopbang_neck",
+        "stopbang_sex",
+        "score_stopbang"
+      ],
+      "flagRule": "pneumo",
+      "questionnaire": true,
+      "scoring": {
+        "scoreKey": "score_stopbang",
+        "max": 8,
+        "questions": [
+          "stopbang_snoring",
+          "stopbang_tired",
+          "stopbang_observed",
+          "stopbang_pressure",
+          "stopbang_bmi",
+          "stopbang_age",
+          "stopbang_neck",
+          "stopbang_sex"
+        ]
+      }
+    },
+    {
+      "id": "t1:fb-epworth",
+      "title": "Epworth Sleepiness Scale",
+      "detail": [
+        "Wie leicht fällt es Ihnen, in den folgenden Situationen einzuschlafen? Gemeint ist das Gefühl der Schläfrigkeit, nicht nur Müdigkeit. Beziehen Sie sich auf das übliche tägliche Leben der vergangenen Wochen. Falls eine Situation zuletzt nicht vorkam, stellen Sie sich deren Wirkung vor.",
+        "Jede Situation mit 0 bis 3 bewerten. Auffällig ab einer Gesamtpunktzahl von 11."
+      ],
+      "fields": [
+        "epworth_0",
+        "epworth_1",
+        "epworth_2",
+        "epworth_3",
+        "epworth_4",
+        "epworth_5",
+        "epworth_6",
+        "epworth_7",
+        "score_epworth"
+      ],
+      "flagRule": "pneumo",
+      "questionnaire": true,
+      "scoring": {
+        "scoreKey": "score_epworth",
+        "max": 24,
+        "questions": [
+          "epworth_0",
+          "epworth_1",
+          "epworth_2",
+          "epworth_3",
+          "epworth_4",
+          "epworth_5",
+          "epworth_6",
+          "epworth_7"
+        ]
+      }
+    },
+    {
+      "id": "t1:fb-mmrc",
+      "title": "mMRC Dyspnoeskala",
+      "scoreDescription": true,
+      "fields": [
+        "score_mmrc"
+      ],
+      "flagRule": "kardio",
+      "questionnaire": true
+    },
+    {
+      "id": "t1:divider:2",
+      "divider": "Labor (inkl. PBM)"
+    },
+    {
+      "id": "t1:laborwerte",
+      "title": "Laborwerte erfassen",
+      "detail": [
+        "Hämatogramm gross; Quick/INR; Ferritin und Transferrinsättigung; Kreatinin, Natrium, Kalium, CRP; Troponin T und BNP.",
+        "Laborberichte können als PDF oder Bild importiert und vor der Übernahme kontrolliert werden. Die manuelle Erfassung bleibt weiterhin möglich."
+      ],
+      "custom": "labs"
+    },
+    {
+      "id": "t1:divider:3",
+      "divider": "Zuweisungen & Massnahmen"
+    },
+    {
+      "id": "t1:anaesthesie",
+      "title": "Anmeldung Anästhesie-Sprechstunde (PAB)",
+      "detail": [
+        "So bald wie möglich, wenn möglich mindestens einen Monat vor Zystektomie und nach allfälligen Kardiologie- und Pneumologieterminen."
+      ],
+      "fields": [
+        "anaesthesie_termin"
+      ]
+    },
+    {
+      "id": "t1:pbm",
+      "title": "Einleitung PBM gemäss Weisung „Perioperative Therapie von Anämie und Eisenmangel“",
+      "detail": [
+        "Weisung: [PBM-Standard (KSW-Portal)](https://portal.ksw.ch/dep/ana/GelenkteDokumente/PBM%20Perioperative%20Therapie%20von%20Ana%CC%88mie%20und%20Eisenmangel%20Standard.docx?Web=1)",
+        "Bei perioperativer Immunochemotherapie: PBM durch Onkologie, telefonische Rücksprache mit behandelnder Onkologie (wenn nicht definiert Dr. Gina Treichler). Sonst Hausarzt mit klarem Auftrag gemäss Weisung informieren; falls Eiseninfusion dort nicht möglich: medizinische Poliklinik, Tel. 3751, Stichwort PBM."
+      ],
+      "fields": [
+        "pbm_status",
+        "pbm_ansprechperson"
+      ]
+    },
+    {
+      "id": "t1:kardio",
+      "title": "Überprüfung Zuweisung Kardiologie gemäss Weisung „Präoperative kardiale Abklärung“",
+      "detail": [
+        "Zuweisung sobald Kriterien erfüllt, oder vorbekannt EF <50% oder mMRC Grad 3/4"
+      ],
+      "fields": [
+        "kardio_ef",
+        {
+          "key": "score_mmrc",
+          "label": "mMRC aus Fragebögen",
+          "options": ["0", "1", "2", "3", "4"]
+        }
+      ],
+      "flagRule": "kardio"
+    },
+    {
+      "id": "t1:raucher",
+      "title": "Raucheranamnese",
+      "detail": [
+        "Nieraucher: keine Massnahmen",
+        "Ex-Raucher >1 Jahr sistiert: Anbindung Rauchstopp-Sprechstunde bei Wunsch",
+        "Raucher oder sistiert <1 Jahr: Anbindung Rauchstopp-Sprechstunde via KISIM „Anmeldung Pneumologie Sprechstunde“ → „Rauchstopp“"
+      ],
+      "fields": [
+        "raucher_status",
+        "raucher_menge",
+        "raucher_py",
+        "raucher_sistiert_seit"
+      ]
+    },
+    {
+      "id": "t1:sucht",
+      "title": "Suchtmittelanamnese",
+      "fields": [
+        "sucht_alkohol"
+      ],
+      "custom": "suchtmittel"
+    },
+    {
+      "id": "t1:pneumo-osas",
+      "title": "Zuweisung Pneumologie – OSAS-Abklärung",
+      "detail": [
+        "Bei bekanntem NIV: Patient instruieren, OSAS-Gerät mitzubringen",
+        "Zuweisung wenn STOP-BANG ≥3× Ja oder Epworth ≥11 — via KISIM „Anmeldung Pneumologie Sprechstunde“"
+      ],
+      "fields": [
+        "pneumo_niv"
+      ],
+      "flagRule": "pneumo"
+    },
+    {
+      "id": "t1:pneumo-copd",
+      "title": "Zuweisung Pneumologie – COPD / Asthma / Lungenfibrose / neuromuskulär",
+      "detail": [
+        "COPD ab Gold I UND Kontrolle >1 Jahr ODER Verschlechterung",
+        "Asthma symptomatisch/Verschlechterung ODER Kontrolle >1 Jahr",
+        "Restriktive Lungenfunktion/Fibrose: Kontrolle >6 Monate → Anmeldung via KISIM „Lungenfunktion (LuFu)“"
+      ],
+      "fields": [
+        "pneumo_grunderkrankung",
+        "pneumo_letzte_kontrolle",
+        "pneumo_verschlechterung"
+      ]
+    },
+    {
+      "id": "t1:ernaehrung1",
+      "title": "Anmeldung Ernährungsberatung",
+      "detail": [
+        "Zuweisung wenn NRS ≥3 (siehe Fragebögen)",
+        "Via KISIM Anmeldung „Ernährungstherapie/-beratung ambulant“ — Aufgebot innert 2 Wochen"
+      ],
+      "fields": [
+        "ernaehrung_termin"
+      ],
+      "flagRule": "ernaehrung"
+    },
+    {
+      "id": "t1:physio1",
+      "title": "Anmeldung Physiotherapie",
+      "detail": [
+        "Alle Patient*innen: Anmeldung „Vita-Reha“ präoperativ via KISIM",
+        "Falls Neoblase: zusätzlich „Beckenbodenphysiotherapie“",
+        "Falls keine Reha/Kur geplant: zusätzlich „Vita-Reha“ postoperativ",
+        "KISIM: Workflow → neu → Gemeinsame Favoriten → Anmeldung Physiotherapie ambulant ViTA-Reha präoperativ bzw. postoperativ. Operation: Zystektomie mit Anlage Ileum conduit oder orthotope Ersatzblase. Keine Limiten."
+      ],
+      "fields": [
+        "physio_neoblase",
+        "physio_rehakur"
+      ]
+    },
+    {
+      "id": "t1:diagnosen",
+      "title": "Vervollständigung Diagnosenliste"
+    },
+    {
+      "id": "t1:medikamente",
+      "title": "Vervollständigung Medikamentenliste"
+    },
+    {
+      "id": "t1:postopmgmt",
+      "title": "Postoperatives Management besprechen",
+      "detail": [
+        "Reha → Kostengutsprache: „Arztzeugnis Nachsorge / Nachsorge- und Sozialberatung“, an Operateur zur Signatur",
+        "Nach Hause mit Spitex → Mitteilung an Pflege: „bitte um Organisation Spitex nach Austritt“"
+      ],
+      "fields": [
+        "postop_wahl"
+      ]
+    },
+    {
+      "id": "t1:thromboinfo",
+      "title": "Patient über Thromboseprophylaxe informieren",
+      "detail": [
+        "Bei eGFR <15 ml/min: Rücksprache mit Operateur",
+        "Wenn bereits unter OAK/Marcoumar: nicht notwendig",
+        "Gemäss BENE-Checkliste: postoperativ jeder Zystektomie-Patient; präoperativ bei perioperativer Immunchemotherapie Eliquis 2.5 mg 1-0-1 während der Immunchemotherapie. Auf Rezept: 2 Tage vor Operation stoppen."
+      ],
+      "fields": [
+        "thrombo_plan",
+        "thrombo_eGFR"
+      ]
+    },
+    {
+      "id": "t1:operateurtermin",
+      "title": "Termin beim Operateur 10–14 Tage vor Operation vorhanden?",
+      "fields": [
+        "operateur_termin_status",
+        "operateur_termin_datum"
+      ]
+    },
+    {
+      "id": "t1:drink",
+      "title": "Information hochkalorischer Drink",
+      "detail": [
+        "Am Vorabend der Operation: 400 ml (4×100 ml) — Ausnahme: Diabetiker*innen nicht",
+        "Am Morgen, spätestens 2h präoperativ: 200 ml (2×100 ml)",
+        "Abgabe und Instruktion am BENE-Termin"
+      ]
+    },
+    {
+      "id": "t1:urinkultur1",
+      "title": "Planung Urinkultur",
+      "fields": [
+        "urinkultur_datum"
+      ]
+    }
+  ],
+  "phases": [
+    {
+      "id": "praeop",
+      "tag": "Phase 1",
+      "title": "Präoperativ",
+      "roles": [
+        {
+          "id": "p-uro",
+          "title": "Urologie-Konsultation",
+          "note": "wenn möglich beim Operateur",
+          "items": [
+            {
+              "id": "t2:p-uro:0",
+              "title": "OP-Aufklärung"
+            },
+            {
+              "id": "t2:p-uro:1",
+              "title": "OP-Anmeldung",
+              "detail": [
+                "In Rücksprache mit Operateur"
+              ]
+            },
+            {
+              "id": "t2:p-uro:3",
+              "title": "Tumorboard (bei onkologischer Zystektomie)",
+              "fields": [
+                "onko_tumorboard_datum"
+              ]
+            },
+            {
+              "id": "t2:p-uro:4",
+              "title": "Anmeldung Onkologie (bei onkologischer Zystektomie)",
+              "fields": [
+                "onko_chemo",
+                "onko_behandler"
+              ]
+            },
+            {
+              "id": "t2:p-uro:5",
+              "title": "Erneute Sprechstunde Urologie (10–14 Tage vor Zystektomie)",
+              "fields": [
+                "onko_folgetermin_datum"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "p-bene",
+          "title": "BENE/ERAS-Sprechstunde",
+          "note": "siehe Tab „Prä-OP Checkliste“",
+          "jump": true,
+          "items": []
+        },
+        {
+          "id": "p-anaes",
+          "title": "Anästhesiologie",
+          "note": "Angaben aus der Prä-OP Checkliste werden automatisch übernommen",
+          "items": [
+            {
+              "id": "t2:p-anaes:0",
+              "title": "Checkliste / SOP Anästhesie Zystektomie durchführen",
+              "fields": [
+                "anaesthesie_termin"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "p-physio",
+          "title": "Physiotherapie",
+          "note": "Angaben aus der Prä-OP Checkliste werden automatisch übernommen",
+          "items": [
+            {
+              "id": "t2:p-physio:0",
+              "title": "Prä- und postoperative Vita-Reha",
+              "fields": [
+                "physio_neoblase",
+                "physio_rehakur"
+              ]
+            },
+            {
+              "id": "t2:p-physio:1",
+              "title": "Kostengutsprache",
+              "detail": [
+                "Wird durch Physiotherapie gestellt — bei Ablehnung kontaktiert Physiotherapie den behandelnden Arzt"
+              ]
+            },
+            {
+              "id": "t2:p-physio:2",
+              "title": "Beckenboden bei Neoblase"
+            },
+            {
+              "id": "t2:p-physio:3",
+              "title": "Präop Vita-Reha vs. einmalige Konsultation",
+              "detail": [
+                "Möglich 6–12 Wochen vor OP"
+              ],
+              "fields": [
+                "physio_pathway_praeop"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "p-ernaehr",
+          "title": "Ernährungsberatung",
+          "note": "Angaben aus der Prä-OP Checkliste werden automatisch übernommen",
+          "items": [
+            {
+              "id": "t2:p-ernaehr:0",
+              "title": "Kann auch telemedizinisch durchgeführt werden",
+              "fields": [
+                "score_nrs",
+                "ernaehrung_termin"
+              ]
+            },
+            {
+              "id": "t2:p-ernaehr:1",
+              "title": "Optimierung Ernährung bei Malnutrition",
+              "detail": [
+                "Messung via NRS",
+                "Intervention ab NRS ≥3",
+                "Kostengutsprache für präoperatives Fresubin / Ernährungsoptimierung"
+              ]
+            },
+            {
+              "id": "t2:p-ernaehr:2",
+              "title": "Keine Rezepte für High-Carb-Produkte"
+            }
+          ]
+        },
+        {
+          "id": "p-stoma",
+          "title": "Stomaberatung",
+          "note": "Anmeldung via BENE-Nurse",
+          "items": [
+            {
+              "id": "t2:p-stoma:0",
+              "title": "Termin Stomaberatung festlegen",
+              "fields": [
+                "stoma_termin"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "intraop",
+      "tag": "Phase 2",
+      "title": "Intraoperativ",
+      "roles": [
+        {
+          "id": "i-uro",
+          "title": "Urologisch-operativ",
+          "items": [
+            {
+              "id": "t2:i-uro:0",
+              "title": "Antibiotische Prophylaxe"
+            }
+          ]
+        },
+        {
+          "id": "i-anaes",
+          "title": "Anästhesie",
+          "items": [
+            {
+              "id": "t2:i-anaes:0",
+              "title": "Checkliste / SOP Anästhesie Zystektomie durchführen"
+            }
+          ]
+        },
+        {
+          "id": "i-lager",
+          "title": "Lagerungspflege",
+          "items": [
+            {
+              "id": "t2:i-lager:0",
+              "title": "SCDs immer",
+              "detail": [
+                "Wird durch Melanie Gaudin in der Anmeldung hinterlegt"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "postop-stat",
+      "tag": "Phase 3",
+      "title": "Postoperativ stationär",
+      "roles": [
+        {
+          "id": "s-pflege",
+          "title": "Pflege",
+          "note": "Meilensteine je Tag",
+          "items": [
+            {
+              "id": "t2:s-pflege:0",
+              "divider": "OP-Tag"
+            },
+            {
+              "id": "t2:s-pflege:0:sub:0",
+              "title": "Neben dem Bett gestanden / am Bettrand gesessen"
+            },
+            {
+              "id": "t2:s-pflege:0:sub:1",
+              "title": "Fresubin / klare Flüssigkeit wird vertragen"
+            },
+            {
+              "id": "t2:s-pflege:0:sub:2",
+              "title": "Kaugummi und Kaffee sobald genug wach"
+            },
+            {
+              "id": "t2:s-pflege:0:sub:3",
+              "title": "Schmerzen mit entsprechender Medikation tolerierbar"
+            },
+            {
+              "id": "t2:s-pflege:1",
+              "divider": "1. postoperativer Tag"
+            },
+            {
+              "id": "t2:s-pflege:1:sub:0",
+              "title": "4h ausserhalb des Bettes / 24h"
+            },
+            {
+              "id": "t2:s-pflege:1:sub:1",
+              "title": "Vollkost wird toleriert"
+            },
+            {
+              "id": "t2:s-pflege:1:sub:2",
+              "title": "Patient trägt eigene Kleidung"
+            },
+            {
+              "id": "t2:s-pflege:1:sub:3",
+              "title": "Schmerzen mit entsprechender Medikation tolerierbar"
+            },
+            {
+              "id": "t2:s-pflege:2",
+              "divider": "2. postoperativer Tag"
+            },
+            {
+              "id": "t2:s-pflege:2:sub:1",
+              "title": "4 Ganglängen gelaufen"
+            },
+            {
+              "id": "t2:s-pflege:2:sub:2",
+              "title": "6h ausserhalb des Bettes / 24h"
+            },
+            {
+              "id": "t2:s-pflege:2:sub:3",
+              "title": "Schmerzen mit entsprechender Medikation tolerierbar"
+            },
+            {
+              "id": "t2:s-pflege:3",
+              "divider": "Ab 3. postoperativem Tag"
+            },
+            {
+              "id": "t2:s-pflege:3:sub:0",
+              "title": "Fortschritte beim Gehtraining"
+            },
+            {
+              "id": "t2:s-pflege:3:sub:1",
+              "title": "Bei Neoblase: Instruktion „Blase anspülen“ erfolgt"
+            },
+            {
+              "id": "t2:s-pflege:3:sub:2",
+              "title": "Kann Urinbeutel selbständig leeren"
+            },
+            {
+              "id": "t2:s-pflege:3:sub:3",
+              "title": "Am Wochenende übernimmt Pflege die AktAss-Aufgaben gemäss Physio-Schema"
+            },
+            {
+              "id": "t2:s-pflege:4",
+              "divider": "Dokumentation"
+            },
+            {
+              "id": "t2:s-pflege:4:sub:0",
+              "title": "Alles Obige in KISIM ärztlich oder pflegerisch (siehe Beispiel Pflegeprozess BENE Pankreas)"
+            }
+          ]
+        },
+        {
+          "id": "s-physio",
+          "title": "Physiotherapie",
+          "items": [
+            {
+              "id": "t2:s-physio:0",
+              "title": "Ab 1. postoperativem Tag Frühmobilisation mit Aktivitätsassistent"
+            },
+            {
+              "id": "t2:s-physio:1",
+              "title": "Physiotherapie ggf. bereits 1. POD, sonst 1–2× während Aufenthalt"
+            },
+            {
+              "id": "t2:s-physio:2",
+              "title": "Aktivitätsassistenz täglich"
+            },
+            {
+              "id": "t2:s-physio:3",
+              "divider": "Mindestziele gemäss Plan Physiotherapie"
+            },
+            {
+              "id": "t2:s-physio:3:sub:0",
+              "title": "OP-Tag: Bettrand / kurze Strecke im Zimmer"
+            },
+            {
+              "id": "t2:s-physio:3:sub:1",
+              "title": "PO1 (evtl. +1): selbständig zimmermobil / ½ bis ganze Ganglänge in Begleitung"
+            },
+            {
+              "id": "t2:s-physio:3:sub:2",
+              "title": "PO2 (evtl. +1): ½ bis ganze Ganglänge selbständig / mehrere Ganglängen & Treppe in Begleitung"
+            },
+            {
+              "id": "t2:s-physio:3:sub:3",
+              "title": "PO3 (evtl. +1): selbständiges Gehtraining / MTT & Treppentraining mit AktAss"
+            },
+            {
+              "id": "t2:s-physio:3:sub:4",
+              "title": "Am Wochenende keine AktAss → Übernahme durch Pflege"
+            },
+            {
+              "id": "t2:s-physio:4",
+              "title": "Dokumentation erwünscht"
+            }
+          ]
+        },
+        {
+          "id": "s-ernaehr",
+          "title": "Ernährungsberatung",
+          "items": [
+            {
+              "id": "t2:s-ernaehr:0",
+              "divider": "Kostaufbau"
+            },
+            {
+              "id": "t2:s-ernaehr:0:sub:0",
+              "title": "Tag 1–3: Vollkost ¼ Portion"
+            },
+            {
+              "id": "t2:s-ernaehr:0:sub:1",
+              "title": "Besuch am 3. POD, dann Steigerung auf ½ Portion"
+            },
+            {
+              "id": "t2:s-ernaehr:0:sub:2",
+              "title": "Ziel: Vollkost ab 1. Tag"
+            },
+            {
+              "id": "t2:s-ernaehr:1",
+              "divider": "Wunschkost"
+            },
+            {
+              "id": "t2:s-ernaehr:1:sub:0",
+              "title": "Kann nur verordnet werden, wenn Ernährungsberatung involviert ist"
+            }
+          ]
+        },
+        {
+          "id": "s-stoma",
+          "title": "Stomaberatung",
+          "items": [
+            {
+              "id": "t2:s-stoma:0",
+              "title": "Besuch während stationärem Aufenthalt"
+            }
+          ]
+        },
+        {
+          "id": "s-uro-visite",
+          "title": "Ärztlich Urologie — Visite & Labor",
+          "items": [
+            {
+              "id": "t2:s-uro-visite:0",
+              "title": "Visitendokumentation gemäss Vorlage"
+            },
+            {
+              "id": "t2:s-uro-visite:1",
+              "divider": "Labortermine"
+            },
+            {
+              "id": "t2:s-uro-visite:1:sub:0",
+              "title": "1. POD: Hb, K, Na, Kreatinin, Troponin"
+            },
+            {
+              "id": "t2:s-uro-visite:1:sub:1",
+              "title": "2. POD: Hb, K, Na, Kreatinin, Mg, Troponin"
+            },
+            {
+              "id": "t2:s-uro-visite:1:sub:2",
+              "title": "3. POD: Hb, Na, K, Kreatinin, Mg, CRP"
+            },
+            {
+              "id": "t2:s-uro-visite:1:sub:3",
+              "title": "4. POD: Hb, Na, K, Kreatinin, Mg, CRP"
+            },
+            {
+              "id": "t2:s-uro-visite:1:sub:4",
+              "title": "Danach gemäss Operateur — Lactatanstieg im Rahmen der Operation ist zu erwarten"
+            },
+            {
+              "id": "t2:s-uro-visite:2",
+              "divider": "Troponin-Kontrolle (V.a. periop. Myokardinfarkt)"
+            },
+            {
+              "id": "t2:s-uro-visite:2:sub:0",
+              "title": "Anstieg Troponin T hs >14 ng/L Tag 1/2 vs. präOP-Wert; ohne präOP-Wert: >70 ng/L oder An-/Abstieg >14 ng/L Tag1 vs. Tag2"
+            },
+            {
+              "id": "t2:s-uro-visite:2:sub:1",
+              "title": "Konsequenz: EKG und Konsil Kardiologie",
+              "fields": [
+                "tropo_preop",
+                "tropo_tag1",
+                "tropo_tag2"
+              ],
+              "flagRule": "tropo"
+            },
+            {
+              "id": "t2:s-uro-visite:3",
+              "divider": "Transfusionsgrenze 90 g/L"
+            },
+            {
+              "id": "t2:s-uro-visite:3:sub:0",
+              "title": "Bei geplanter Transfusion ab höheren Werten: Rücksprache mit Operateur (negativer Einfluss auf Onkologie)"
+            },
+            {
+              "id": "t2:s-uro-visite:4",
+              "divider": "Kaliumziel hochnormal 4–4.5 mmol/L"
+            },
+            {
+              "id": "t2:s-uro-visite:4:sub:0",
+              "title": "Sobald Kalium <4 mmol/L: Start ≥60 mmol/24h Kalium i.v. bis Koststufe 2"
+            }
+          ]
+        },
+        {
+          "id": "s-uro-mikro",
+          "title": "Ärztlich Urologie — Mikrobiologie & Thromboseprophylaxe",
+          "items": [
+            {
+              "id": "t2:s-uro-mikro:0",
+              "title": "Urinkultur aus Stomabeutel am 4. POD"
+            },
+            {
+              "id": "t2:s-uro-mikro:1",
+              "divider": "Clexane"
+            },
+            {
+              "id": "t2:s-uro-mikro:1:sub:0",
+              "title": "Start am OP-Tag 6h postoperativ, danach täglich (im KISIM inkl. Dosierung)"
+            },
+            {
+              "id": "t2:s-uro-mikro:1:sub:1",
+              "title": "Insgesamt 4 Wochen postoperativ"
+            },
+            {
+              "id": "t2:s-uro-mikro:1:sub:2",
+              "title": "Instruktion bis 2. POD erfolgt"
+            },
+            {
+              "id": "t2:s-uro-mikro:2",
+              "divider": "Intermittierende pneumatische Kompression (SCD-Pumpe)"
+            },
+            {
+              "id": "t2:s-uro-mikro:2:sub:0",
+              "title": "Solange auf IPS, danach Wechsel auf Thrombosestrümpfe bis Austritt"
+            }
+          ]
+        },
+        {
+          "id": "s-uro-analgesie",
+          "title": "Ärztlich Urologie — Analgesie & Kost",
+          "items": [
+            {
+              "id": "t2:s-uro-analgesie:0",
+              "title": "Rectus-Sheath-Katheter gemäss SOP"
+            },
+            {
+              "id": "t2:s-uro-analgesie:1",
+              "divider": "PDA-Katheter"
+            },
+            {
+              "id": "t2:s-uro-analgesie:1:sub:0",
+              "title": "Ca. 72h postoperativ gemäss Anästhesie"
+            },
+            {
+              "id": "t2:s-uro-analgesie:2",
+              "divider": "Basisanalgesie i.v. oder p.o."
+            },
+            {
+              "id": "t2:s-uro-analgesie:2:sub:0",
+              "title": "Novalgin, Dafalgan, NSAR"
+            },
+            {
+              "id": "t2:s-uro-analgesie:2:sub:1",
+              "title": "Wenn immer möglich keine Opiate — NRS 3/10 akzeptieren, erst bei ausgeschöpfter Basisanalgesie"
+            },
+            {
+              "id": "t2:s-uro-analgesie:3",
+              "divider": "Kost- und Medikamentenplan"
+            },
+            {
+              "id": "t2:s-uro-analgesie:3:sub:0",
+              "title": "Freie Flüssigkeit schluckweise am OP-Tag, Kaugummi/Kaffee sobald wach"
+            },
+            {
+              "id": "t2:s-uro-analgesie:3:sub:1",
+              "title": "Vollkost ab 1. postoperativem Tag; Magnesiocard 5 mmol 1-0-0-0 p.o.; Kalium gemäss Labor"
+            },
+            {
+              "id": "t2:s-uro-analgesie:3:sub:2",
+              "title": "Pantoprazol 40 mg i.v., ab 2. POD p.o. bis Austritt"
+            },
+            {
+              "id": "t2:s-uro-analgesie:3:sub:3",
+              "title": "Freka Klyss durch Arzt am 2. POD wenn noch kein Stuhlgang; medikamentöse Darmstimulation"
+            },
+            {
+              "id": "t2:s-uro-analgesie:3:sub:4",
+              "title": "Tägliche Gewichtsmessung, Bilanz immer, Bilanzziel ± 0 ml"
+            },
+            {
+              "id": "t2:s-uro-analgesie:3:sub:5",
+              "title": "Keine reguläre antibiotische Prophylaxe"
+            }
+          ]
+        },
+        {
+          "id": "s-uro-drain",
+          "title": "Ärztlich Urologie — Drainagen & Urostoma",
+          "items": [
+            {
+              "id": "t2:s-uro-drain:0",
+              "divider": "Ureterkatheter beidseits"
+            },
+            {
+              "id": "t2:s-uro-drain:0:sub:0",
+              "title": "Links mit schräger Spitze — Fördermenge kontrollieren, bei Bedarf anspülen mit 2–4 ml, 1×/Schicht"
+            },
+            {
+              "id": "t2:s-uro-drain:1",
+              "divider": "Urostoma-Management"
+            },
+            {
+              "id": "t2:s-uro-drain:1:sub:0",
+              "title": "Urinkultur aus Stomabeutel am 3. POD"
+            },
+            {
+              "id": "t2:s-uro-drain:1:sub:1",
+              "title": "Bei Austritt am 5. POD: Entfernung UK rechts am 5. und UK links am 6. POD unter resistenzgerechter Therapie oder Bactrim p.o."
+            },
+            {
+              "id": "t2:s-uro-drain:1:sub:2",
+              "title": "Bei früherem Austritt: Entfernung nach 7–14 Tagen beim Operateur — Sonographie, resistenzgerecht oder empirisch 1× Bactrim p.o. bei negativer Urinkultur",
+              "fields": [
+                "urostoma_entfernung_re",
+                "urostoma_entfernung_li"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "s-uro-austritt",
+          "title": "Ärztlich Urologie — Austrittsbericht",
+          "items": [
+            {
+              "id": "t2:s-uro-austritt:0",
+              "divider": "Diagnosen überprüfen (CW-relevant)"
+            },
+            {
+              "id": "t2:s-uro-austritt:0:sub:0",
+              "title": "Postoperatives Delir"
+            },
+            {
+              "id": "t2:s-uro-austritt:0:sub:1",
+              "title": "Akute Nephritis mit Keimen (a.e. Pyelonephritis nach Zug Mono-J-Katheter)"
+            },
+            {
+              "id": "t2:s-uro-austritt:0:sub:2",
+              "title": "Karzinom als Hauptdiagnose"
+            },
+            {
+              "id": "t2:s-uro-austritt:0:sub:3",
+              "title": "Blutungsanämie mit Massnahmen / Suche nach Blutungsquelle"
+            },
+            {
+              "id": "t2:s-uro-austritt:0:sub:4",
+              "title": "Alle Erreger dokumentieren"
+            }
+          ]
+        },
+        {
+          "id": "s-ips",
+          "title": "Ärztlich IPS",
+          "items": [
+            {
+              "id": "t2:s-ips:0",
+              "title": "MAP mindestens 65 mmHg halten"
+            },
+            {
+              "id": "t2:s-ips:1",
+              "divider": "Volumenplus vermeiden"
+            },
+            {
+              "id": "t2:s-ips:1:sub:0",
+              "title": "Grosszügig Vasopressoren nutzen (reduziert Komplikationen um ca. 50%, Wuethrich et al., Anesthesiology 2014)"
+            },
+            {
+              "id": "t2:s-ips:1:sub:1",
+              "title": "Erhöhung der Volumengabe nur nach Rücksprache mit Oberarzt IPS oder Operateur"
+            }
+          ]
+        },
+        {
+          "id": "s-schmerz",
+          "title": "Ärztlich Anästhesie / Schmerzdienst",
+          "items": [
+            {
+              "id": "t2:s-schmerz:0",
+              "divider": "Bei PDA: Laufrate nach Schmerzen anpassen"
+            },
+            {
+              "id": "t2:s-schmerz:0:sub:0",
+              "title": "Nicht zu früh reduzieren nur zur Blutdruckoptimierung"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "postop-amb",
+      "tag": "Phase 4",
+      "title": "Postoperativ ambulant",
+      "roles": [
+        {
+          "id": "a-aerztlich",
+          "title": "Ärztlich",
+          "items": [
+            {
+              "id": "t2:a-aerztlich:0",
+              "title": "Thromboseprophylaxe für 4 Wochen postoperativ fortführen"
+            },
+            {
+              "id": "t2:a-aerztlich:1",
+              "title": "Bei Ileum-Conduit",
+              "detail": [
+                "Bei Austritt am 5. POD: Entfernung UK nach 7–14 Tagen beim Operateur — Sonographie, resistenzgerecht oder empirisch 1× Bactrim p.o. bei negativer Urinkultur"
+              ],
+              "fields": [
+                "amb_ileum_uk_entfernung"
+              ]
+            },
+            {
+              "id": "t2:a-aerztlich:2",
+              "title": "Bei Neoblase",
+              "detail": [
+                "Urinkultur aus Pouchkatheter (Hausarzt oder Urologie)",
+                "Re-Hospitalisation für 1 Nacht zur Inbetriebnahme der Neoblase, unter resistenzgerechter Therapie gemäss Kultur",
+                "Zystographie, vBGA vor Katheterzug und am Morgen danach"
+              ],
+              "fields": [
+                "amb_neoblase_rehosp_datum"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "a-physio",
+          "title": "Physiotherapie",
+          "items": [
+            {
+              "id": "t2:a-physio:0",
+              "title": "Vita-Reha analog präoperativ, falls keine Reha geplant"
+            },
+            {
+              "id": "t2:a-physio:1",
+              "title": "Booklet analog präoperativ"
+            },
+            {
+              "id": "t2:a-physio:2",
+              "title": "Bei Neoblase: postoperativ Beckenboden"
+            }
+          ]
+        },
+        {
+          "id": "a-stoma",
+          "title": "Stomaberatung",
+          "items": [
+            {
+              "id": "t2:a-stoma:0",
+              "title": "Termine postoperativ festlegen",
+              "fields": [
+                "amb_stoma_termin"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "a-ernaehr",
+          "title": "Ernährungsberatung",
+          "items": [
+            {
+              "id": "t2:a-ernaehr:0",
+              "title": "Nach Hospitalisation aktuell nicht vorgesehen"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

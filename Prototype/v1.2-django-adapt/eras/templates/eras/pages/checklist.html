@@ -13,13 +13,13 @@
   <div class="pathway-rail-title">Laufbahn</div>
   <button type="button" data-rail-tab="t1" data-rail-target="#pname">Patient</button>
   <button type="button" data-rail-tab="t1" data-rail-target='[data-id="t1:vitalparameter"]'>Vitalparameter</button>
-  <button type="button" data-rail-tab="t1" data-rail-target='[data-id="t1:fb-g8"]'>Fragebögen</button>
-  <button type="button" data-rail-tab="t1" data-rail-target='[data-id="t1:laborwerte"]'>Labor</button>
-  <button type="button" data-rail-tab="t1" data-rail-target='[data-id="t1:anaesthesie"]'>Zuweisungen</button>
-  <button type="button" data-rail-tab="t2" data-rail-target='[data-role="p-uro"]'>Präoperativ</button>
-  <button type="button" data-rail-tab="t2" data-rail-target='[data-role="i-uro"]'>Intraoperativ</button>
-  <button type="button" data-rail-tab="t2" data-rail-target='[data-role="s-pflege"]'>Stationär</button>
-  <button type="button" data-rail-tab="t2" data-rail-target='[data-role="a-aerztlich"]'>Ambulant</button>
+  <button type="button" data-rail-tab="t1" data-rail-target='[data-divider="t1:divider:1"]'>Fragebögen</button>
+  <button type="button" data-rail-tab="t1" data-rail-target='[data-divider="t1:divider:2"]'>Labor</button>
+  <button type="button" data-rail-tab="t1" data-rail-target='[data-divider="t1:divider:3"]'>Zuweisungen</button>
+  <button type="button" data-rail-tab="t2" data-rail-target='[data-phase="praeop"]'>Präoperativ</button>
+  <button type="button" data-rail-tab="t2" data-rail-target='[data-phase="intraop"]'>Intraoperativ</button>
+  <button type="button" data-rail-tab="t2" data-rail-target='[data-phase="postop-stat"]'>Stationär</button>
+  <button type="button" data-rail-tab="t2" data-rail-target='[data-phase="postop-amb"]'>Ambulant</button>
 </aside>
 
 <div class="wrap">
@@ -42,4 +42,4 @@
 
 {% block footer %}{% include "eras/includes/checklist_footer.html" %}{% endblock %}
 
-{% block extra_js %}<script src="{% static 'eras/js/checklist.js' %}" defer></script><script src="{% static 'eras/js/questionnaires.js' %}" defer></script><script src="{% static 'eras/js/meeting.js' %}" defer></script>{% endblock %}
+{% block extra_js %}{{ checklist_definition|json_script:"checklist-definition" }}<script src="{% static 'eras/js/checklist.js' %}" defer></script><script src="{% static 'eras/js/questionnaires.js' %}" defer></script><script src="{% static 'eras/js/worklist.js' %}" defer></script>{% endblock %}

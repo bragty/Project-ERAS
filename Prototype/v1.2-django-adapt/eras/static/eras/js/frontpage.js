@@ -142,7 +142,7 @@ async function savePatient(){
     patientNumber: document.getElementById("newPatientNumber").value.trim(),
     caseNumber: document.getElementById("newCaseNumber").value.trim(),
     opDate: document.getElementById("newOpDate").value,
-    procedure: document.getElementById("newProcedure").value
+    procedureTypeId: document.getElementById("newProcedure").value
   };
   if(!patient.name || !patient.caseNumber){alert("Name und eindeutige Fallnummer sind erforderlich.");return;}
   try {

@@ -45,6 +45,8 @@ python manage.py createsuperuser
 |---|---|---|
 | Patienten | suchen, Stammdaten korrigieren, Fälle des Patienten sehen | – |
 | Behandlungsfälle | filtern/suchen, Stammdaten korrigieren, neu anlegen, archivieren/wiederherstellen (Aktion) | Archivieren mit unvollständiger Checkliste |
+| Eingriffsarten | anlegen/umbenennen, pro Eingriffsart festlegen, welche Checklistenpunkte gelten | Löschen, solange Fälle sie verwenden |
+| Checklisten-Texte | Titel, Hinweise, Feldbeschriftungen, Auswahloptionen, Phasen/Berufsgruppen umbenennen; auf Standardtext zurücksetzen (Aktion) | Items hinzufügen/entfernen/umsortieren, Regeln ändern (nur im Code) |
 | Checklistenstände | Fortschritt, Revision, Validierungsfehler und JSON-Zustand ansehen | Antworten bearbeiten (nur über die App, damit Validierung/Revision/Audit greifen) |
 | Audit-Events | filtern, suchen, Metadaten ansehen | ändern, löschen |
 | Benutzer/Gruppen | Admin-Konten und Rechte verwalten | – |
@@ -52,6 +54,58 @@ python manage.py createsuperuser
 Änderungen an Fällen über das Admin erzeugen `AuditEvent`s
 (`case_created_admin`, `case_updated_admin`); zusätzlich führt Django ein eigenes
 Admin-Protokoll mit Benutzername („Letzte Aktionen“ / Verlauf pro Objekt).
+
+### Klinische Regeln
+
+Alle Regeln stehen **nur im Backend** in `apps/checklist/rules.py`:
+bedingte Pflichtfelder (`REQUIRED_IF`), Hinweis-Flags (`FLAG_RULES`) und
+Zuweisungen inkl. KISIM-Textbausteine (`REFERRALS`). Felder, die nie Pflicht
+sind, tragen in `definition.json` `"optional": true`.
+
+Die Engine wendet sie bei jedem Speichern an und liefert das Ergebnis als
+`derived` (BMI, Flags, markierte Felder, Zuweisungen) und `validationErrors`
+(Gründe, warum ein Häkchen abgelehnt wurde). Das Frontend zeigt nur an:
+Häkchen werden sofort gespeichert, der Server nimmt unvollständige wieder
+zurück und nennt die fehlenden Angaben direkt beim Punkt.
+
+Ältere gespeicherte Stände werden beim Laden serverseitig migriert
+(`engine.migrate_state`, Schema-Version in `definition.json`).
+
+### Checklistenpunkte pro Eingriffsart
+
+Unter **Eingriffsarten** wird pro Eingriffsart angehakt, welche
+Checklistenpunkte gelten. Standard: alle; neu hinzukommende Punkte sind
+automatisch enthalten (gespeichert werden nur die Ausschlüsse).
+
+- Die Eingriffsart wird beim Erfassen des Falls gewählt (Auswahl = aktive
+  Eingriffsarten) und kann im Admin beim Behandlungsfall geändert werden.
+  Fälle ohne Eingriffsart erhalten die vollständige Checkliste.
+- Ausgeschlossene Punkte werden nicht angezeigt und zählen weder für den
+  Fortschritt noch für den Abschluss/das Archivieren. Bereits gesetzte Häkchen
+  bleiben gespeichert und erscheinen wieder, wenn der Punkt erneut gilt.
+- Änderungen wirken sofort auf alle laufenden Fälle der Eingriffsart (Fortschritt
+  wird neu berechnet); archivierte Fälle behalten ihren gespeicherten Stand.
+  Jede Änderung erzeugt ein `AuditEvent` (`procedure_type_items_changed`).
+
+### Checklisten-Texte anpassen
+
+Aufbau und Texte der Checkliste stehen an **einer** Stelle:
+`apps/checklist/definition.json`. Daraus leiten sich die Backend-Validierung
+(`checklist/schema.py`) und das Frontend ab; die Seite bettet die Definition ein.
+
+- Texte werden im Admin unter **Checklisten-Texte** geändert und sind nach dem
+  Neuladen der Checkliste sichtbar. Filter „angepasst“ zeigt alle Abweichungen
+  vom Code-Standard.
+- Hinweise: ein Aufzählungspunkt pro Zeile, Links als `[Linktext](https://…)`.
+  Texte werden als reiner Text angezeigt (kein HTML).
+- Bei Auswahloptionen ändert sich nur die Beschriftung; der gespeicherte Wert
+  bleibt gleich, Antworten und Regeln bleiben gültig.
+- Item-IDs (z. B. `t1:pbm`, `t2:p-uro:3`) sind in gespeicherten Checklisten und
+  Audit-Events referenziert und dürfen nie geändert oder wiederverwendet werden.
+  Neue Items erhalten eine neue ID.
+- `python manage.py migrate` gleicht die Text-Tabelle automatisch mit
+  `definition.json` ab (manuell: `python manage.py sync_checklist_texts`).
+  Nicht angepasste Texte folgen Änderungen im Code; angepasste bleiben erhalten.
 
 ## Architektur
 
@@ -81,7 +135,7 @@ SQLite (Standard) oder optional PostgreSQL (per Umgebungsvariablen)
 apps/
 ├── core/          API-Helfer und gemeinsame Fehlerbehandlung
 ├── patients/      Patient + TreatmentCase, Services, Selektoren, API
-├── checklist/    serverseitiges Schema + Domain Engine für Validierung/Progress
+├── checklist/     Checklisten-Definition (definition.json), Schema, Engine, bearbeitbare Texte
 ├── responses/     ChecklistState pro Behandlungsfall
 ├── workflow/      Archivieren / Wiederherstellen
 └── audit/         AuditEvent ohne Benutzerbezug
@@ -239,8 +293,16 @@ Vor dem Einsatz mit echten Patientendaten mit der Spital-IT klären:
 python manage.py check
 python manage.py migrate
 python manage.py test
-node --test eras/meeting.test.cjs
+node --test eras/checklist.test.cjs eras/lab-import.test.cjs eras/definition.test.cjs
 ```
+
+`apps/checklist/definition.json` wird bei jedem `check`, `runserver` und
+`migrate` geprüft (Django-Systemcheck `checklist.E001`): eindeutige IDs, korrekte
+ID-Präfixe (`t1:`/`t2:`), definierte und verwendete Felder, gültige Feldtypen und
+Optionen, Tippfehler in Eigenschaften und die Maximalpunktzahl von Fragebögen.
+Geprüft werden auch `flagRule`-Namen und die in `rules.py` genannten Felder.
+`eras/definition.test.cjs` prüft, dass verwendete `custom`-Bausteine im Frontend
+existieren.
 
 ## Wichtige Hinweise
 
@@ -384,12 +446,3 @@ LAB_IMPORT_OCR_LANG=deu+eng
 - `frontpage.js`: Patientenübersicht aktualisiert sich alle 5 s (nur bei Änderungen neu gerendert)
 - Polling pausiert in Hintergrund-Tabs und läuft beim Zurückwechseln sofort an.
   Keine zusätzliche Infrastruktur (WebSockets/Redis) nötig; Nginx/systemd bleiben unverändert.
-
-### Wichtige Einschränkung
-
-Der im Repository vorhandene Beispielstand enthält einen Labor-Screenshot, aber
-keinen vollständigen originalen Labor-PDF-Export mit allen benötigten Parametern.
-Der OCR-Pfad wurde daher gegen den verfügbaren Screenshot und der Text-PDF-Pfad
-gegen eine synthetische tabellarische PDF-Struktur geprüft. Vor einer fachlichen
-Abnahme müssen anonymisierte Originalberichte (digitales PDF, Scan/Bild,
-mehrseitig) mit manuell geprüften Sollwerten getestet werden.

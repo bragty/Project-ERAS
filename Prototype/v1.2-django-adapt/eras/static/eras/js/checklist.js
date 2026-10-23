@@ -1,353 +1,29 @@
 /* ============================= DATA ============================= */
 
-const CHECKLIST1 = [
-  {id:"vitalparameter", title:"Vitalparameter erfassen", fields:[
-    {key:"vital_rr_sys", label:"RR systolisch (mmHg)", type:"number", min:0},
-    {key:"vital_rr_dia", label:"RR diastolisch (mmHg)", type:"number", min:0},
-    {key:"vital_puls", label:"Puls (/min)", type:"number", min:0},
-    {key:"vital_spo2", label:"SpO2 (%)", type:"number", min:0, max:100},
-    {key:"vital_temp", label:"Temperatur (C)", type:"number", step:"0.1"},
-    {key:"vital_gewicht", label:"Gewicht (kg)", type:"number", min:0, step:"0.1"}
-  ]},
+/* The checklist structure and its texts come from apps/checklist/definition.json
+   (texts possibly edited in the Django admin), embedded by the page template.
+   Fields are referenced by key and resolved here; preop items keep their short
+   id ("pbm" for "t1:pbm"), pathway items their full id as pathId. */
+const CHECKLIST_DEFINITION = JSON.parse(document.getElementById('checklist-definition').textContent);
 
-  {divider:"Fragebögen"},
-  {id:"fb-g8", title:"Fragebogen G8 (geriatrisches Screening)", detail:["Bei tiefem Score: Zuweisung ad Geriatrie"], fields:[
-    {key:"score_g8", label:"G8-Score (0–17)", type:"number", min:0, max:17},
-    {key:"g8_zuweisung", label:"Zuweisung Geriatrie", type:"select", options:["Ja","Nein"]}
-  ]},
-  {id:"fb-nrs", title:"Fragebogen NRS (Nutritional Risk Screening)", flagRule:"ernaehrung", fields:[
-    {key:"score_nrs", label:"NRS-Score (0–7)", type:"number", min:0, max:7}
-  ]},
-  {id:"fb-ecog", title:"Fragebogen ECOG", fields:[
-    {key:"score_ecog", label:"ECOG Performance Status", type:"select", options:[
-      "0 = vollständig aktiv",
-      "1 = körperlich anstrengende Aktivität eingeschränkt",
-      "2 = gehfähig, aber zunehmend eingeschränkt",
-      "3 = überwiegend Bett/Stuhl",
-      "4 = vollständig pflegeabhängig",
-      "5 = verstorben"
-    ]}
-  ]},
-  {id:"fb-stopbang", title:"Fragebogen STOP-BANG", flagRule:"pneumo", fields:[
-    {key:"score_stopbang", label:"Anzahl Ja-Antworten (0–8)", type:"number", min:0, max:8}
-  ]},
-  {id:"fb-epworth", title:"Epworth Sleepiness Scale", flagRule:"pneumo", fields:[
-    {key:"score_epworth", label:"Epworth-Score (0–24)", type:"number", min:0, max:24}
-  ]},
-  {id:"fb-mmrc", title:"mMRC Dyspnoeskala", flagRule:"kardio", fields:[
-    {key:"score_mmrc", label:"mMRC-Grad", type:"select", options:["0","1","2","3","4"]}
-  ]},
+function resolveFields(refs){
+  return refs.map(ref => typeof ref === "string"
+    ? {key:ref, ...CHECKLIST_DEFINITION.fields[ref]}
+    : {...CHECKLIST_DEFINITION.fields[ref.key], ...ref});
+}
 
-  {divider:"Labor (inkl. PBM)"},
-  {id:"laborwerte", title:"Laborwerte erfassen", custom:"labs"},
+function definitionItem(item, idProps){
+  if (item.divider) return {divider:item.divider, dividerId:item.id};
+  const {id, fields, ...rest} = item;
+  return {...rest, ...idProps, ...(fields ? {fields:resolveFields(fields)} : {})};
+}
 
-  {divider:"Zuweisungen &amp; Massnahmen"},
-  {id:"anaesthesie", title:"Anmeldung Anästhesie-Sprechstunde (PAB)", fields:[
-    {key:"anaesthesie_termin", label:"Termin-Datum", type:"date"}
-  ]},
-  {id:"pbm", title:"Einleitung PBM gemäss Weisung „Perioperative Therapie von Anämie und Eisenmangel“", detail:[
-    "Weisung: <a href='https://portal.ksw.ch/dep/ana/GelenkteDokumente/PBM%20Perioperative%20Therapie%20von%20Ana%CC%88mie%20und%20Eisenmangel%20Standard.docx?Web=1' target='_blank' rel='noopener'>PBM-Standard (KSW-Portal)</a>",
-    "Details werden nach fachlicher Klärung gemäss Weisung ergänzt."
-  ], fields:[
-    {key:"pbm_status", label:"Status", type:"select", options:["Noch zu prüfen","Eingeleitet","Nicht notwendig"]},
-    {key:"pbm_ansprechperson", label:"Ansprechperson / Notiz", type:"text"}
-  ]},
-  {id:"kardio", title:"Überprüfung Zuweisung Kardiologie gemäss Weisung „Präoperative kardiale Abklärung“", detail:[
-    "Zuweisung sobald Kriterien erfüllt, oder vorbekannt EF &lt;50% oder mMRC Grad 3/4"
-  ], flagRule:"kardio", fields:[
-    {key:"kardio_ef", label:"EF (%)", type:"number", min:0, max:100},
-    {key:"kardio_mmrs", label:"mMRS", type:"number", min:0, max:6}
-  ]},
-  {id:"raucher", title:"Raucheranamnese", fields:[
-    {key:"raucher_status", label:"Status", type:"select", options:["Nieraucher","Ex-Raucher, sistiert >1 Jahr","Ex-Raucher, sistiert <1 Jahr","Aktiver Raucher"]},
-    {key:"raucher_menge", label:"Zigaretten/Tag", type:"number", min:0},
-    {key:"raucher_py", label:"Pack Years", type:"number", min:0, step:"0.1"},
-    {key:"raucher_sistiert_seit", label:"Sistiert seit (MM/JJJJ)", type:"text", placeholder:"MM/JJJJ"}
-  ], detail:[
-    "Nieraucher: keine Massnahmen",
-    "Ex-Raucher &gt;1 Jahr sistiert: Anbindung Rauchstopp-Sprechstunde bei Wunsch",
-    "Raucher oder sistiert &lt;1 Jahr: Anbindung Rauchstopp-Sprechstunde via KISIM „Anmeldung Pneumologie Sprechstunde“ → „Rauchstopp“"
-  ]},
-  {id:"sucht", title:"Suchtmittelanamnese", fields:[
-    {key:"sucht_alkohol", label:"Alkohol – was, wie häufig?", type:"text"}
-  ], custom:"suchtmittel"},
-  {id:"pneumo-osas", title:"Zuweisung Pneumologie – OSAS-Abklärung", flagRule:"pneumo", fields:[
-    {key:"pneumo_niv", label:"Bekanntes (O)SAS mit NIV-Therapie?", type:"select", options:["Ja","Nein"]}
-  ], detail:[
-    "Bei bekanntem NIV: Patient instruieren, OSAS-Gerät mitzubringen",
-    "Zuweisung wenn STOP-BANG ≥3× Ja oder Epworth ≥11 — via KISIM „Anmeldung Pneumologie Sprechstunde“"
-  ]},
-  {id:"pneumo-copd", title:"Zuweisung Pneumologie – COPD / Asthma / Lungenfibrose / neuromuskulär", fields:[
-    {key:"pneumo_grunderkrankung", label:"Grunderkrankung", type:"select", options:["Keine","COPD","Asthma","Lungenfibrose/restriktive Lungenfunktion","Neuromuskuläre Erkrankung/Tetraplegie"]},
-    {key:"pneumo_letzte_kontrolle", label:"Letzte Kontrolle Pneumologie", type:"date"},
-    {key:"pneumo_verschlechterung", label:"Verschlechterung?", type:"select", options:["Ja","Nein"]}
-  ], detail:[
-    "COPD ab Gold I UND Kontrolle &gt;1 Jahr ODER Verschlechterung",
-    "Asthma symptomatisch/Verschlechterung ODER Kontrolle &gt;1 Jahr",
-    "Restriktive Lungenfunktion/Fibrose: Kontrolle &gt;6 Monate → Anmeldung via KISIM „Lungenfunktion (LuFu)“"
-  ]},
-  {id:"ernaehrung1", title:"Anmeldung Ernährungsberatung", flagRule:"ernaehrung", fields:[
-    {key:"ernaehrung_termin", label:"Termin vereinbart am", type:"date"}
-  ], detail:[
-    "Zuweisung wenn NRS ≥3 (siehe Fragebögen)",
-    "Via KISIM Anmeldung „Ernährungstherapie/-beratung ambulant“ — Aufgebot innert 2 Wochen"
-  ]},
-  {id:"physio1", title:"Anmeldung Physiotherapie", fields:[
-    {key:"physio_neoblase", label:"Neoblase geplant?", type:"select", options:["Ja","Nein"]},
-    {key:"physio_rehakur", label:"Reha/Kur bereits geplant?", type:"select", options:["Ja","Nein","Noch offen"]}
-  ], detail:[
-    "Alle Patient*innen: Anmeldung „Vita-Reha“ präoperativ via KISIM",
-    "Falls Neoblase: zusätzlich „Beckenbodenphysiotherapie“",
-    "Falls keine Reha/Kur geplant: zusätzlich „Vita-Reha“ postoperativ"
-  ]},
-  {id:"diagnosen", title:"Vervollständigung Diagnosenliste"},
-  {id:"medikamente", title:"Vervollständigung Medikamentenliste"},
-  {id:"kisimpfad", title:"KISIM-Pfad verordnen"},
-  {id:"postopmgmt", title:"Postoperatives Management besprechen", fields:[
-    {key:"postop_wahl", label:"Gewählte Nachsorge", type:"select", options:["Reha","Kur","Nach Hause mit Spitex"]}
-  ], detail:[
-    "Reha → Kostengutsprache: „Arztzeugnis Nachsorge / Nachsorge- und Sozialberatung“, an Operateur zur Signatur",
-    "Nach Hause mit Spitex → Mitteilung an Pflege: „bitte um Organisation Spitex nach Austritt“"
-  ]},
-  {id:"thromboinfo", title:"Patient über Thromboseprophylaxe informieren", fields:[
-    {key:"thrombo_plan", label:"Plan / Verordnung", type:"text"},
-    {key:"thrombo_eGFR", label:"eGFR (ml/min), falls relevant", type:"text"}
-  ], detail:[
-    "Bei eGFR &lt;15 ml/min: Rücksprache mit Operateur",
-    "Wenn bereits unter OAK/Marcoumar: nicht notwendig"
-  ]},
-  {id:"operateurtermin", title:"Termin beim Operateur 10–14 Tage vor Operation vorhanden?", fields:[
-    {key:"operateur_termin_status", label:"Termin vorhanden?", type:"select", options:["Ja","Nein"]},
-    {key:"operateur_termin_datum", label:"Termin-Datum", type:"date"}
-  ]},
-  {id:"drink", title:"Information hochkalorischer Drink", detail:[
-    "Am Vorabend der Operation: 400 ml (4×100 ml) — Ausnahme: Diabetiker*innen nicht",
-    "Am Morgen, spätestens 2h präoperativ: 200 ml (2×100 ml)",
-    "Abgabe und Instruktion am BENE-Termin"
-  ]},
-  {id:"urinkultur1", title:"Planung Urinkultur", fields:[
-    {key:"urinkultur_datum", label:"Geplantes Datum", type:"date"}
-  ]}
-];
+const CHECKLIST1 = CHECKLIST_DEFINITION.preop.map(it => definitionItem(it, {id:it.id.replace(/^t1:/, "")}));
 
-const PHASES = [
-  {
-    id:"praeop", tag:"Phase 1", title:"Präoperativ",
-    roles:[
-      {id:"p-uro", title:"Urologie-Konsultation", note:"wenn möglich beim Operateur", items:[
-        {title:"OP-Aufklärung"},
-        {title:"OP-Anmeldung", detail:["In Rücksprache mit Operateur"]},
-        {title:"BENE-Nurse informieren", detail:["Per Telefon oder Mail informieren und Termin vereinbaren"], fields:[
-          {key:"bene_termin_datum", label:"Termin vereinbart am", type:"date"}
-        ]},
-        {title:"Tumorboard (bei onkologischer Zystektomie)", fields:[
-          {key:"onko_tumorboard_datum", label:"Tumorboard-Datum", type:"date"}
-        ]},
-        {title:"Anmeldung Onkologie (bei onkologischer Zystektomie)", fields:[
-          {key:"onko_chemo", label:"Periop. Chemoimmuntherapie geplant?", type:"select", options:["Ja","Nein"]},
-          {key:"onko_behandler", label:"Zuständige/r Onkologe/in", type:"text"}
-        ]},
-        {title:"Erneute Sprechstunde Urologie (10–14 Tage vor Zystektomie)", fields:[
-          {key:"onko_folgetermin_datum", label:"Termin-Datum", type:"date"}
-        ]}
-      ]},
-      {id:"p-bene", title:"BENE/ERAS-Sprechstunde", note:"siehe Tab „Prä-OP Checkliste“", jump:true, items:[]},
-      {id:"p-anaes", title:"Anästhesiologie", items:[
-        {title:"Checkliste / SOP Anästhesie Zystektomie durchführen"}
-      ]},
-      {id:"p-physio", title:"Physiotherapie", note:"Anmeldung via BENE-Nurse", items:[
-        {title:"Prä- und postoperative Vita-Reha"},
-        {title:"Kostengutsprache", detail:["Wird durch Physiotherapie gestellt — bei Ablehnung kontaktiert Physiotherapie den behandelnden Arzt"]},
-        {title:"Beckenboden bei Neoblase"},
-        {title:"Präop Vita-Reha vs. einmalige Konsultation", detail:["Möglich 6–12 Wochen vor OP"], fields:[
-          {key:"physio_pathway_praeop", label:"Gewählt", type:"select", options:["Vita-Reha (Serie)","Einmalige Konsultation"]}
-        ]}
-      ]},
-      {id:"p-ernaehr", title:"Ernährungsberatung", note:"Anmeldung via BENE-Nurse", items:[
-        {title:"Kann auch telemedizinisch durchgeführt werden"},
-        {title:"Optimierung Ernährung bei Malnutrition", detail:["Messung via NRS","Intervention ab NRS &gt;3","Kostengutsprache für präoperatives Fresubin / Ernährungsoptimierung"]},
-        {title:"Keine Rezepte für High-Carb-Produkte"}
-      ]},
-      {id:"p-stoma", title:"Stomaberatung", note:"Anmeldung via BENE-Nurse", items:[
-        {title:"Zeitpunkt und Anzahl Treffen individuell festlegen", fields:[
-          {key:"stoma_anzahl_treffen", label:"Anzahl Treffen", type:"select", options:["1","2"]}
-        ]},
-        {title:"Fakultatives Treffen bei Unsicherheit bezüglich Stoma"}
-      ]}
-    ]
-  },
-  {
-    id:"intraop", tag:"Phase 2", title:"Intraoperativ",
-    roles:[
-      {id:"i-uro", title:"Urologisch-operativ", items:[{title:"Antibiotische Prophylaxe"}]},
-      {id:"i-anaes", title:"Anästhesie", items:[{title:"Checkliste / SOP Anästhesie Zystektomie durchführen"}]},
-      {id:"i-lager", title:"Lagerungspflege", items:[{title:"SCDs immer", detail:["Wird durch Melanie Gaudin in der Anmeldung hinterlegt"]}]}
-    ]
-  },
-  {
-    id:"postop-stat", tag:"Phase 3", title:"Postoperativ stationär",
-    roles:[
-      {id:"s-pflege", title:"Pflege", note:"Meilensteine je Tag", items:[
-        {title:"OP-Tag", detail:["Neben dem Bett gestanden / am Bettrand gesessen","Fresubin / klare Flüssigkeit wird vertragen","Kaugummi und Kaffee sobald genug wach","Schmerzen mit entsprechender Medikation tolerierbar"]},
-        {title:"1. postoperativer Tag", detail:["4h ausserhalb des Bettes / 24h","Vollkost wird toleriert","Patient trägt eigene Kleidung","Schmerzen mit entsprechender Medikation tolerierbar"]},
-        {title:"2. postoperativer Tag", detail:["Instruktion Fragmin-Injektion erfolgt","4 Ganglängen gelaufen","6h ausserhalb des Bettes / 24h","Schmerzen mit entsprechender Medikation tolerierbar"]},
-        {title:"Ab 3. postoperativem Tag", detail:["Fortschritte beim Gehtraining","Bei Neoblase: Instruktion „Blase anspülen“ erfolgt","Kann Urinbeutel selbständig leeren","Am Wochenende übernimmt Pflege die AktAss-Aufgaben gemäss Physio-Schema"]},
-        {title:"Dokumentation", detail:["Alles Obige in KISIM ärztlich oder pflegerisch (siehe Beispiel Pflegeprozess BENE Pankreas)"]}
-      ]},
-      {id:"s-physio", title:"Physiotherapie", items:[
-        {title:"Ab 1. postoperativem Tag Frühmobilisation mit Aktivitätsassistent"},
-        {title:"Physiotherapie ggf. bereits 1. POD, sonst 1–2× während Aufenthalt"},
-        {title:"Aktivitätsassistenz täglich"},
-        {title:"Mindestziele gemäss Plan Physiotherapie", detail:[
-          "OP-Tag: Bettrand / kurze Strecke im Zimmer",
-          "PO1 (evtl. +1): selbständig zimmermobil / ½ bis ganze Ganglänge in Begleitung",
-          "PO2 (evtl. +1): ½ bis ganze Ganglänge selbständig / mehrere Ganglängen &amp; Treppe in Begleitung",
-          "PO3 (evtl. +1): selbständiges Gehtraining / MTT &amp; Treppentraining mit AktAss",
-          "Am Wochenende keine AktAss → Übernahme durch Pflege"
-        ]},
-        {title:"Dokumentation erwünscht"}
-      ]},
-      {id:"s-ernaehr", title:"Ernährungsberatung", items:[
-        {title:"Kostaufbau", detail:["Tag 1–3: Vollkost ¼ Portion","Besuch am 3. POD, dann Steigerung auf ½ Portion","Ziel: Vollkost ab 1. Tag"]},
-        {title:"Wunschkost", detail:["Kann nur verordnet werden, wenn Ernährungsberatung involviert ist"]}
-      ]},
-      {id:"s-stoma", title:"Stomaberatung", items:[{title:"Besuch während stationärem Aufenthalt"}]},
-      {id:"s-uro-visite", title:"Ärztlich Urologie — Visite &amp; Labor", items:[
-        {title:"Visitendokumentation gemäss Vorlage"},
-        {title:"Labortermine", detail:[
-          "1. POD: Hb, K, Na, Kreatinin, Troponin",
-          "2. POD: Hb, K, Na, Kreatinin, Mg, Troponin",
-          "3. POD: Hb, Na, K, Kreatinin, Mg, CRP",
-          "4. POD: Hb, Na, K, Kreatinin, Mg, CRP",
-          "Danach gemäss Operateur — Lactatanstieg im Rahmen der Operation ist zu erwarten"
-        ]},
-        {title:"Troponin-Kontrolle (V.a. periop. Myokardinfarkt)", flagRule:"tropo", detail:[
-          "Anstieg Troponin T hs &gt;14 ng/L Tag 1/2 vs. präOP-Wert; ohne präOP-Wert: &gt;70 ng/L oder An-/Abstieg &gt;14 ng/L Tag1 vs. Tag2",
-          "Konsequenz: EKG und Konsil Kardiologie"
-        ], fields:[
-          {key:"tropo_preop", label:"Troponin präOP (ng/L)", type:"number"},
-          {key:"tropo_tag1", label:"Troponin Tag 1 (ng/L)", type:"number"},
-          {key:"tropo_tag2", label:"Troponin Tag 2 (ng/L)", type:"number"}
-        ]},
-        {title:"Transfusionsgrenze 90 g/L", detail:["Bei geplanter Transfusion ab höheren Werten: Rücksprache mit Operateur (negativer Einfluss auf Onkologie)"]},
-        {title:"Kaliumziel hochnormal 4–4.5 mmol/L", detail:["Sobald Kalium &lt;4 mmol/L: Start ≥60 mmol/24h Kalium i.v. bis Koststufe 2"]}
-      ]},
-      {id:"s-uro-mikro", title:"Ärztlich Urologie — Mikrobiologie &amp; Thromboseprophylaxe", items:[
-        {title:"Urinkultur aus Stomabeutel am 4. POD"},
-        {title:"Clexane", detail:["Start am OP-Tag 6h postoperativ, danach täglich (im KISIM inkl. Dosierung)","Insgesamt 4 Wochen postoperativ","Instruktion bis 2. POD erfolgt"]},
-        {title:"Intermittierende pneumatische Kompression (SCD-Pumpe)", detail:["Solange auf IPS, danach Wechsel auf Thrombosestrümpfe bis Austritt"]}
-      ]},
-      {id:"s-uro-analgesie", title:"Ärztlich Urologie — Analgesie &amp; Kost", items:[
-        {title:"Rectus-Sheath-Katheter gemäss SOP"},
-        {title:"PDA-Katheter", detail:["Ca. 72h postoperativ gemäss Anästhesie"]},
-        {title:"Basisanalgesie i.v. oder p.o.", detail:["Novalgin, Dafalgan, NSAR","Wenn immer möglich keine Opiate — NRS 3/10 akzeptieren, erst bei ausgeschöpfter Basisanalgesie"]},
-        {title:"Kost- und Medikamentenplan", detail:[
-          "Freie Flüssigkeit schluckweise am OP-Tag, Kaugummi/Kaffee sobald wach",
-          "Vollkost ab 1. postoperativem Tag; Magnesiocard 5 mmol 1-0-0-0 p.o.; Kalium gemäss Labor",
-          "Pantoprazol 40 mg i.v., ab 2. POD p.o. bis Austritt",
-          "Freka Klyss durch Arzt am 2. POD wenn noch kein Stuhlgang; medikamentöse Darmstimulation",
-          "Tägliche Gewichtsmessung, Bilanz immer, Bilanzziel ± 0 ml",
-          "Keine reguläre antibiotische Prophylaxe"
-        ]}
-      ]},
-      {id:"s-uro-drain", title:"Ärztlich Urologie — Drainagen &amp; Urostoma", items:[
-        {title:"Ureterkatheter beidseits", detail:["Links mit schräger Spitze — Fördermenge kontrollieren, bei Bedarf anspülen mit 2–4 ml, 1×/Schicht"]},
-        {title:"Urostoma-Management", detail:[
-          "Urinkultur aus Stomabeutel am 3. POD",
-          "Bei Austritt am 5. POD: Entfernung UK rechts am 5. und UK links am 6. POD unter resistenzgerechter Therapie oder Bactrim p.o.",
-          "Bei früherem Austritt: Entfernung nach 7–14 Tagen beim Operateur — Sonographie, resistenzgerecht oder empirisch 1× Bactrim p.o. bei negativer Urinkultur"
-        ], fields:[
-          {key:"urostoma_entfernung_re", label:"Entfernung UK rechts (Datum)", type:"date"},
-          {key:"urostoma_entfernung_li", label:"Entfernung UK links (Datum)", type:"date"}
-        ]}
-      ]},
-      {id:"s-uro-austritt", title:"Ärztlich Urologie — Austrittsbericht", items:[
-        {title:"Diagnosen überprüfen (CW-relevant)", detail:[
-          "Postoperatives Delir",
-          "Akute Nephritis mit Keimen (a.e. Pyelonephritis nach Zug Mono-J-Katheter)",
-          "Karzinom als Hauptdiagnose",
-          "Blutungsanämie mit Massnahmen / Suche nach Blutungsquelle",
-          "Alle Erreger dokumentieren"
-        ]}
-      ]},
-      {id:"s-ips", title:"Ärztlich IPS", items:[
-        {title:"MAP mindestens 65 mmHg halten"},
-        {title:"Volumenplus vermeiden", detail:["Grosszügig Vasopressoren nutzen (reduziert Komplikationen um ca. 50%, Wuethrich et al., Anesthesiology 2014)","Erhöhung der Volumengabe nur nach Rücksprache mit Oberarzt IPS oder Operateur"]}
-      ]},
-      {id:"s-schmerz", title:"Ärztlich Anästhesie / Schmerzdienst", items:[
-        {title:"Bei PDA: Laufrate nach Schmerzen anpassen", detail:["Nicht zu früh reduzieren nur zur Blutdruckoptimierung"]}
-      ]}
-    ]
-  },
-  {
-    id:"postop-amb", tag:"Phase 4", title:"Postoperativ ambulant",
-    roles:[
-      {id:"a-aerztlich", title:"Ärztlich", items:[
-        {title:"Thromboseprophylaxe für 4 Wochen postoperativ fortführen"},
-        {title:"Bei Ileum-Conduit", detail:["Bei Austritt am 5. POD: Entfernung UK nach 7–14 Tagen beim Operateur — Sonographie, resistenzgerecht oder empirisch 1× Bactrim p.o. bei negativer Urinkultur"], fields:[
-          {key:"amb_ileum_uk_entfernung", label:"Entfernung UK (Datum)", type:"date"}
-        ]},
-        {title:"Bei Neoblase", detail:[
-          "Urinkultur aus Pouchkatheter (Hausarzt oder Urologie)",
-          "Re-Hospitalisation für 1 Nacht zur Inbetriebnahme der Neoblase, unter resistenzgerechter Therapie gemäss Kultur",
-          "Zystographie, vBGA vor Katheterzug und am Morgen danach"
-        ], fields:[
-          {key:"amb_neoblase_rehosp_datum", label:"Re-Hospitalisation (Datum)", type:"date"}
-        ]}
-      ]},
-      {id:"a-physio", title:"Physiotherapie", items:[
-        {title:"Vita-Reha analog präoperativ, falls keine Reha geplant"},
-        {title:"Booklet analog präoperativ"},
-        {title:"Bei Neoblase: postoperativ Beckenboden"}
-      ]},
-      {id:"a-stoma", title:"Stomaberatung", items:[
-        {title:"Termine postoperativ festlegen", fields:[
-          {key:"amb_stoma_termin", label:"Termin-Datum", type:"date"}
-        ]}
-      ]},
-      {id:"a-ernaehr", title:"Ernährungsberatung", items:[{title:"Nach Hospitalisation aktuell nicht vorgesehen"}]}
-    ]
-  }
-];
-
-/* Rules for auto-computed flags, keyed by data-rule name.
-   Multiple flag-boxes across the app can share the same rule. */
-const FLAG_RULES = {
-  pneumo: (a) => {
-    const sb = parseFloat(a["score_stopbang"]);
-    const ep = parseFloat(a["score_epworth"]);
-    if ((!isNaN(sb) && sb >= 3) || (!isNaN(ep) && ep >= 11)) {
-      return "STOP-BANG ≥3 oder Epworth ≥11 → Zuweisung Pneumologie zur OSAS-Abklärung empfohlen.";
-    }
-    return null;
-  },
-  ernaehrung: (a) => {
-    const nrs = parseFloat(a["score_nrs"]);
-    if (!isNaN(nrs) && nrs >= 3) return "NRS ≥3 → Zuweisung Ernährungsberatung empfohlen.";
-    return null;
-  },
-  kardio: (a) => {
-    const ef = parseFloat(a["kardio_ef"]);
-    const mmrc = parseFloat(a["score_mmrc"]);
-    const mmrs = parseFloat(a["kardio_mmrs"]);
-    if ((!isNaN(ef) && ef < 50) || (!isNaN(mmrc) && mmrc >= 3) || (!isNaN(mmrs) && mmrs >= 3)) {
-      return "EF <50%, mMRC Grad 3/4 oder mMRS ≥3 → Zuweisung Kardiologie empfohlen.";
-    }
-    return null;
-  },
-  tropo: (a) => {
-    const pre = parseFloat(a["tropo_preop"]);
-    const t1 = parseFloat(a["tropo_tag1"]);
-    const t2 = parseFloat(a["tropo_tag2"]);
-    let trigger = false;
-    if (!isNaN(pre)) {
-      if ((!isNaN(t1) && (t1 - pre) > 14) || (!isNaN(t2) && (t2 - pre) > 14)) trigger = true;
-    } else {
-      if ((!isNaN(t1) && t1 > 70) || (!isNaN(t2) && t2 > 70) || (!isNaN(t1) && !isNaN(t2) && Math.abs(t1 - t2) > 14)) trigger = true;
-    }
-    return trigger ? "V.a. periop. Myokardinfarkt → EKG und Konsil Kardiologie veranlassen." : null;
-  }
-};
+const PHASES = CHECKLIST_DEFINITION.phases.map(ph => ({
+  ...ph,
+  roles: ph.roles.map(r => ({...r, items: r.items.map(it => definitionItem(it, {pathId:it.id}))}))
+}));
 
 /* ============================= STATE ============================= */
 const LAB_OPTIONS = [
@@ -363,11 +39,27 @@ const LAB_IMPORT_OPTIONS = LAB_OPTIONS.filter(label => label !== "Anderer Wert")
 let LAB_IMPORT_PREVIEW = null;
 let LAB_IMPORT_BUSY = false;
 
+// Same limit as NOTE_MAX_LENGTH in apps/checklist/engine.py.
+const NOTE_MAX_LENGTH = 2000;
+
 let STATE = { patientName:"", opDate:"", checked:{}, openBlocks:{}, answers:{}, notes:{}, labs:[], suchtmittel:[] };
 let saveTimer = null;
 
+/* Everything rule-based (flags, BMI, referrals, questionnaire totals, whether a
+   tick is valid) is computed by the backend (apps/checklist/rules.py) on every
+   save and only displayed here. DERIVED holds the last server result,
+   ITEM_ERRORS the reasons why the server refused a tick, per item. */
+let DERIVED = {};
+let ITEM_ERRORS = {};
+
 function esc(s){
   return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+// Texts from the definition are plain text; only links written as
+// [Linktext](https://…) become anchors.
+function richText(s){
+  return esc(s).replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
 }
 
 function preopItemIds(){
@@ -512,7 +204,7 @@ async function processLabImport(file){
   }finally{
     LAB_IMPORT_BUSY = false;
     renderChecklist1();
-    updateFlags();
+    renderDerived();
   }
 }
 
@@ -572,7 +264,7 @@ function applyLabImport(){
   LAB_IMPORT_PREVIEW = null;
   renderChecklist1();
   updateProgress();
-  updateFlags();
+  renderDerived();
   scheduleSave();
 }
 
@@ -598,39 +290,54 @@ function customHTML(kind){
 
 function itemHTML(id, title, opts){
   opts = opts || {};
-  const { detail, fields, flagRule, custom } = opts;
+  const { fields, flagRule, custom } = opts;
   const checked = !!STATE.checked[id];
-  const detailHTML = detail ? `<div class="item-detail"><ul>${detail.map(d=>`<li>${d}</li>`).join("")}</ul></div>` : "";
+  const detail = (opts.detail || []).map(d => `<li>${richText(d)}</li>`);
+  if (opts.widget === "bmi") detail.push('<li>BMI: <output id="bmi">Grösse und Gewicht erfassen</output></li>');
+  if (opts.scoreDescription) detail.push(`<li><p class="questionnaire-description" data-score-description="${opts.id}" aria-live="polite"></p></li>`);
+  const detailHTML = detail.length ? `<div class="item-detail"><ul>${detail.join("")}</ul></div>` : "";
   const fieldsStr = fields && fields.length ? fieldsHTML(fields) : "";
   const customStr = custom ? customHTML(custom) : "";
   const flagHTML = flagRule ? `<div class="flag-box" data-rule="${flagRule}"></div>` : "";
+  const errorsHTML = itemErrorsHTML(id, fields || []);
   const noteVal = STATE.notes[id] || "";
   const noteOpen = noteVal ? "open" : "";
   return `<div class="item ${checked?'checked':''}" data-id="${id}">
     <input type="checkbox" ${checked?'checked':''} data-id="${id}">
     <div class="item-body">
-      <div class="item-title" data-id="${id}">${title}</div>
-      ${opts.questionnaire ? `<details class="questionnaire" data-questionnaire="${opts.id}" ${STATE.openBlocks['questionnaire:'+opts.id]&&!checked?'open':''}><summary>Fragebogen ausfüllen <span data-questionnaire-result="${opts.id}"></span></summary>` : ''}
+      <div class="item-title" data-id="${id}">${esc(title)}</div>
+      ${opts.questionnaire ? `<details class="questionnaire" data-questionnaire="${opts.id}" ${(STATE.openBlocks['questionnaire:'+opts.id]&&!checked)||ITEM_ERRORS[id]?'open':''}><summary>Fragebogen ausfüllen <span data-questionnaire-result="${opts.id}"></span></summary>` : ''}
       <div class="item-content">${detailHTML}
       ${fieldsStr}
       ${customStr}
       ${flagHTML}
+      ${errorsHTML}
       <button type="button" class="note-toggle" data-notetoggle="${id}">${noteVal? '– Notiz ausblenden' : '+ Notiz'}</button>
       <div class="note-wrap ${noteOpen}" data-notewrap="${id}">
-        <textarea data-notekey="${id}" rows="2" placeholder="Freitext-Notiz…">${esc(noteVal)}</textarea>
+        <textarea data-notekey="${id}" rows="2" maxlength="${NOTE_MAX_LENGTH}" placeholder="Freitext-Notiz…">${esc(noteVal)}</textarea>
       </div></div>
       ${opts.questionnaire ? "</details>" : ""}
     </div>
   </div>`;
 }
 
-function dividerHTML(label){
-  return `<div class="group-divider">${label}</div>`;
+function itemErrorsHTML(id, fields){
+  const errors = ITEM_ERRORS[id];
+  if (!errors) return "";
+  const lines = Object.entries(errors).map(([key, message]) => {
+    const field = fields.find(f => f.key === key);
+    return `<li>${field ? `${esc(field.label)}: ` : ""}${esc(message)}</li>`;
+  });
+  return `<div class="item-errors" role="alert"><strong>Kann nicht abgehakt werden:</strong><ul>${lines.join("")}</ul></div>`;
+}
+
+function dividerHTML(label, id){
+  return `<div class="group-divider" data-divider="${esc(id)}">${esc(label)}</div>`;
 }
 
 function renderChecklist1(){
   const el = document.getElementById('items-t1');
-  el.innerHTML = CHECKLIST1.map(i => i.divider ? dividerHTML(i.divider) : itemHTML("t1:"+i.id, i.title, i)).join("");
+  el.innerHTML = CHECKLIST1.map(i => i.divider ? dividerHTML(i.divider, i.dividerId) : itemHTML("t1:"+i.id, i.title, i)).join("");
 }
 
 function renderPhases(){
@@ -645,7 +352,7 @@ function renderPhases(){
           <button class="jumplink" data-jump="t1">Zur Prä-OP Checkliste →</button>
         </div>`;
       } else {
-        itemsHTML = r.items.map((it,idx) => it.divider ? dividerHTML(it.divider) : itemHTML(it.pathId, it.title, it)).join("");
+        itemsHTML = r.items.map((it,idx) => it.divider ? dividerHTML(it.divider, it.dividerId) : itemHTML(it.pathId, it.title, it)).join("");
       }
       const total = r.items.filter(it=>!it.divider).length;
       const done = r.items.reduce((n,it,idx)=> n + (STATE.checked[it.pathId] ? 1:0), 0);
@@ -653,7 +360,7 @@ function renderPhases(){
       return `<div class="role-block ${isOpen?'open':''}" data-role="${r.id}">
         <div class="role-head" data-role-toggle="${r.id}">
           <span class="chev">▸</span>
-          <span class="role-title">${r.title}${r.note?`<span style="font-weight:400;color:var(--ink-soft);"> — ${r.note}</span>`:''}</span>
+          <span class="role-title">${esc(r.title)}${r.note?`<span style="font-weight:400;color:var(--ink-soft);"> — ${esc(r.note)}</span>`:''}</span>
           ${countLabel}
         </div>
         <div class="role-items">${itemsHTML}</div>
@@ -663,9 +370,9 @@ function renderPhases(){
     const totalItems = ph.roles.reduce((n,r)=> n + r.items.filter(it=>!it.divider).length, 0);
     const doneItems = ph.roles.reduce((n,r)=> n + r.items.reduce((m,it,idx)=> m + (STATE.checked[it.pathId]?1:0),0), 0);
 
-    return `<div class="phase-head">
-        <span class="phase-tag">${ph.tag}</span>
-        <h2>${ph.title}</h2>
+    return `<div class="phase-head" data-phase="${esc(ph.id)}">
+        <span class="phase-tag">${esc(ph.tag)}</span>
+        <h2>${esc(ph.title)}</h2>
         <span class="phase-progress">${doneItems}/${totalItems}</span>
       </div>
       ${rolesHTML}`;
@@ -699,7 +406,7 @@ function attachHandlers(){
     const applyImport = e.target.closest('[data-lab-import-apply]');
     if (applyImport){ applyLabImport(); return; }
     const cancelImport = e.target.closest('[data-lab-import-cancel]');
-    if (cancelImport){ LAB_IMPORT_PREVIEW=null; renderChecklist1(); updateFlags(); return; }
+    if (cancelImport){ LAB_IMPORT_PREVIEW=null; renderChecklist1(); renderDerived(); return; }
     const dropzoneClick = e.target.closest('[data-lab-dropzone]');
     if (dropzoneClick && !e.target.closest('button,input,select')){
       dropzoneClick.querySelector('[data-lab-file]')?.click();
@@ -707,9 +414,11 @@ function attachHandlers(){
     }
     const cb = e.target.closest('input[type=checkbox]');
     if (cb && cb.dataset.id){
-      if (cb.checked && !validateItem(cb.dataset.id)) { cb.checked = false; return; }
+      // The server validates the tick on save; if fields are missing it removes
+      // the tick again and returns the reasons (shown via ITEM_ERRORS).
       STATE.checked[cb.dataset.id] = cb.checked;
-      scheduleSave();
+      delete ITEM_ERRORS[cb.dataset.id];
+      saveNow();
       updateProgress();
       const row = cb.closest('.item');
       if (row) { row.classList.toggle('checked', cb.checked); const disclosure=row.querySelector('details.questionnaire'); if(disclosure && cb.checked) disclosure.open=false; }
@@ -741,7 +450,7 @@ function attachHandlers(){
     if (addLab){
       STATE.labs.push({type:"", value:"", unit:""});
       renderChecklist1();
-      updateFlags();
+      renderDerived();
       scheduleSave();
       return;
     }
@@ -751,7 +460,7 @@ function attachHandlers(){
       STATE.labs.splice(idx, 1);
       if (!STATE.labs.length) STATE.labs.push({type:"", value:"", unit:""});
       renderChecklist1();
-      updateFlags();
+      renderDerived();
       scheduleSave();
       return;
     }
@@ -759,7 +468,7 @@ function attachHandlers(){
     if (addSucht){
       STATE.suchtmittel.push({substance:"", frequency:"", note:""});
       renderChecklist1();
-      updateFlags();
+      renderDerived();
       scheduleSave();
       return;
     }
@@ -769,7 +478,7 @@ function attachHandlers(){
       STATE.suchtmittel.splice(idx, 1);
       if (!STATE.suchtmittel.length) STATE.suchtmittel.push({substance:"", frequency:"", note:""});
       renderChecklist1();
-      updateFlags();
+      renderDerived();
       scheduleSave();
       return;
     }
@@ -806,14 +515,16 @@ function attachHandlers(){
     const f = e.target.closest('[data-fkey]');
     if (f){
       STATE.answers[f.dataset.fkey] = f.value;
+      invalidateConfirmations(itemIdsUsingField(f.dataset.fkey));
       scheduleSave();
-      updateFlags();
+      renderDerived();
       return;
     }
     const lab = e.target.closest('[data-lab-idx]');
     if (lab){
       const idx = parseInt(lab.dataset.labIdx, 10);
       STATE.labs[idx][lab.dataset.labKey] = lab.value;
+      invalidateConfirmations(['t1:laborwerte']);
       scheduleSave();
       return;
     }
@@ -854,7 +565,7 @@ function attachHandlers(){
     if (f){
       STATE.answers[f.dataset.fkey] = f.value;
       scheduleSave();
-      updateFlags();
+      renderDerived();
     }
     const lab = e.target.closest('select[data-lab-idx]');
     if (lab){
@@ -880,7 +591,7 @@ function attachHandlers(){
       renderChecklist1();
       renderPhases();
       updateProgress();
-      updateFlags();
+      renderDerived();
       saveState(true);
     }
   });
@@ -911,6 +622,30 @@ function attachHandlers(){
   });
 }
 
+function itemIdsUsingField(key){
+  const usesKey = it => it.fields?.some(f => f.key === key);
+  return [
+    ...CHECKLIST1.filter(usesKey).map(it => 't1:' + it.id),
+    ...PHASES.flatMap(p => p.roles.flatMap(r => r.items)).filter(usesKey).map(it => it.pathId)
+  ];
+}
+
+// Editing data invalidates prior confirmations everywhere the data is used.
+function invalidateConfirmations(itemIds){
+  itemIds.forEach(id => {
+    delete STATE.checked[id];
+    delete ITEM_ERRORS[id];
+    const row = document.querySelector(`.item[data-id="${id}"]`);
+    if (row){
+      row.classList.remove('checked');
+      row.querySelector('input[type=checkbox]').checked = false;
+      row.querySelector('.item-errors')?.remove();
+    }
+  });
+  PHASES.forEach(p => p.roles.forEach(r => refreshRoleCount(r.id)));
+  updateProgress();
+}
+
 function refreshRoleCount(roleId){
   const ph = PHASES.find(p => p.roles.some(r=>r.id===roleId));
   if (!ph) return;
@@ -931,6 +666,13 @@ function refreshRoleCount(roleId){
   }
 }
 
+// Sections are missing when the case's Eingriffsart excludes all their items.
+function hideMissingRailTargets(){
+  document.querySelectorAll('[data-rail-target]').forEach(btn => {
+    btn.hidden = !document.querySelector(btn.dataset.railTarget);
+  });
+}
+
 function switchTab(tab){
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab===tab));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -946,28 +688,51 @@ function renderProgress(ids, pctId, segId){
   const total = ids.length;
   const done = ids.filter(id => STATE.checked[id]).length;
   const pct = total ? Math.round((done/total)*100) : 0;
-  document.getElementById(pctId).textContent = pct + '%';
+  // A section without items for this Eingriffsart has nothing to do, not 0 % done.
+  document.getElementById(pctId).textContent = total ? pct + '%' : '–';
   const segCount = 20;
   const filled = Math.round((pct/100)*segCount);
   const seg = document.getElementById(segId);
   seg.innerHTML = Array.from({length:segCount}).map((_,i)=> `<div class="seg ${i<filled?'filled':''}"></div>`).join("");
 }
 
-function updateFlags(){
-  updateClinicalUI();
-  Object.keys(FLAG_RULES).forEach(rule => {
-    const text = FLAG_RULES[rule](STATE.answers);
-    document.querySelectorAll(`.flag-box[data-rule="${rule}"]`).forEach(el => {
-      if (text){ el.textContent = text; el.classList.add('show'); }
-      else { el.textContent = ''; el.classList.remove('show'); }
-    });
+// Shows the last server result; nothing here decides anything itself.
+function renderDerived(){
+  updateQuestionnaireResults();
+  const bmi = document.getElementById('bmi');
+  if (bmi) bmi.textContent = DERIVED.bmi != null ? DERIVED.bmi.toFixed(1) + ' kg/m²' : 'Grösse und Gewicht erfassen';
+  document.querySelectorAll('.flag-box[data-rule]').forEach(el => {
+    const text = DERIVED.flagMessages?.[el.dataset.rule];
+    el.textContent = text || '';
+    el.classList.toggle('show', !!text);
   });
+  const flagged = new Set(DERIVED.flaggedFields || []);
+  const refused = new Set(Object.values(ITEM_ERRORS).flatMap(Object.keys));
+  document.querySelectorAll('[data-fkey]').forEach(field => {
+    const key = field.dataset.fkey;
+    if (document.activeElement !== field) field.value = STATE.answers[key] ?? '';
+    const filled = !!field.value;
+    // checkValidity only applies the field's own min/max/step from the definition.
+    const invalid = refused.has(key) || (filled && !field.checkValidity());
+    field.classList.toggle('invalid', invalid || (filled && flagged.has(key)));
+    field.classList.toggle('valid', filled && !invalid && !flagged.has(key));
+    field.setAttribute('aria-invalid', String(invalid));
+  });
+  renderWorklist();
 }
 
 function scheduleSave(){
   clearTimeout(saveTimer);
   document.getElementById('saveState').textContent = 'speichere …';
   saveTimer = setTimeout(() => { saveTimer = null; saveState(false); }, 500);
+}
+
+// Ticks are saved at once, so the server's verdict follows without delay.
+function saveNow(){
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  document.getElementById('saveState').textContent = 'speichere …';
+  saveState();
 }
 
 /* ============================= LIVE SYNC ============================= */
@@ -1026,18 +791,23 @@ function withoutLocalOnly(state){
   return copy;
 }
 
-// Applies the same client-side migrations as loadState, so server states and
-// the local state are compared in the same shape.
-function normalizeClientState(raw){
-  const current = STATE;
-  STATE = Object.assign(emptyState(), cloneValue(raw) || {});
-  try{
-    migrateState();
-    migrateQuestionnaireState();
-    return STATE;
-  }finally{
-    STATE = current;
+function serverState(res){
+  return Object.assign(emptyState(), JSON.parse(res.value));
+}
+
+// Takes over a server response: its state (merged with edits made meanwhile),
+// the derived results and the reasons for refused ticks.
+function applyServerResult(res, base){
+  const remote = serverState(res);
+  DERIVED = res.derived || {};
+  const refused = res.validationErrors || {};
+  Object.assign(ITEM_ERRORS, refused);
+  const changed = adoptRemoteState(base || remote, remote);
+  Object.keys(ITEM_ERRORS).forEach(id => { if (STATE.checked[id]) delete ITEM_ERRORS[id]; });
+  if (!changed){
+    if (Object.keys(refused).length) rerenderFromState(); else renderDerived();
   }
+  return { remote, changed };
 }
 
 function captureUIState(){
@@ -1090,7 +860,7 @@ function rerenderFromState(){
   renderChecklist1();
   renderPhases();
   updateProgress();
-  updateFlags();
+  renderDerived();
   restoreUIState(ui);
 }
 
@@ -1110,8 +880,7 @@ async function pullRemoteState(force){
   const res = await window.storage.get(caseStorageKey(), false);
   // A save finished meanwhile and already delivered a newer state.
   if (!force && (SYNC.saving || (SYNC.revision != null && res.revision <= SYNC.revision))) return { changed:false, localEdits:false };
-  const remote = normalizeClientState(JSON.parse(res.value));
-  const changed = adoptRemoteState(SYNC.base || remote, remote);
+  const { remote, changed } = applyServerResult(res, SYNC.base);
   SYNC.base = remote;
   SYNC.revision = res.revision;
   return { changed, localEdits:!deepEqual(withoutLocalOnly(STATE), withoutLocalOnly(remote)) };
@@ -1148,13 +917,11 @@ async function saveState(){
   const sent = cloneValue(STATE);
   try{
     const res = await window.storage.set(caseStorageKey(), JSON.stringify(sent), {baseRevision: SYNC.revision ?? undefined});
-    const remote = normalizeClientState(JSON.parse(res.value));
     // Takes over server-side normalization (scores, invalid ticks removed)
     // for everything not edited again while the request was running.
-    adoptRemoteState(sent, remote);
+    const { remote } = applyServerResult(res, sent);
     SYNC.base = remote;
     SYNC.revision = res.revision;
-    saveCaseSummary();
     document.getElementById('saveState').textContent = 'Automatisch gespeichert · ' + syncTime();
   }catch(err){
     if (err.status === 409){
@@ -1183,10 +950,11 @@ async function loadState(){
   try{
     const res = await window.storage.get(caseStorageKey(), false);
     if (res && res.value){
-      const parsed = JSON.parse(res.value);
-      STATE = Object.assign(emptyState(), parsed);
-      SYNC.base = normalizeClientState(parsed);
+      STATE = serverState(res);
+      SYNC.base = cloneValue(STATE);
       SYNC.revision = res.revision;
+      DERIVED = res.derived || {};
+      ITEM_ERRORS = res.validationErrors || {};
     }
   }catch(err){
     // no saved state yet — start fresh
@@ -1203,13 +971,22 @@ async function loadState(){
   }
   document.getElementById('pname').value = STATE.patientName || "";
   document.getElementById('opdate').value = STATE.opDate || "";
-  migrateState();
-  migrateQuestionnaireState();
   renderChecklist1();
   renderPhases();
+  hideMissingRailTargets();
   updateProgress();
-  updateFlags();
+  renderDerived();
   document.getElementById('saveState').textContent = 'Bereit';
-  renderWorklist();
   startLiveSync();
 }
+
+function caseStorageKey(){
+  const caseId = new URLSearchParams(location.search).get('case');
+  return caseId ? `bene-eras-case:${caseId}` : 'bene-eras-state-v3';
+}
+
+// Deferred scripts have all run by now, so every part of the page is defined.
+document.addEventListener('DOMContentLoaded', () => {
+  attachHandlers();
+  loadState();
+});

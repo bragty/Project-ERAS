@@ -30,6 +30,15 @@ class TreatmentCase(models.Model):
     surgeon = models.CharField(max_length=255, blank=True)
     op_date = models.DateField(null=True, blank=True)
     procedure = models.CharField(max_length=255, blank=True)
+    # Determines which checklist items apply; no type means the full checklist.
+    procedure_type = models.ForeignKey(
+        "checklist.ProcedureType",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="cases",
+        verbose_name="Eingriffsart (Checkliste)",
+    )
     archived = models.BooleanField(default=False)
     archived_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

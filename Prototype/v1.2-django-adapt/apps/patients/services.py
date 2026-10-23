@@ -3,6 +3,7 @@ from datetime import date
 from django.db import IntegrityError, transaction
 
 from apps.audit.services import record_event
+from apps.checklist.models import ProcedureType
 from apps.core.api import ApiError
 from apps.responses.services import create_initial_checklist_state
 
@@ -25,6 +26,23 @@ def _parse_iso_date(value, field_name="opDate"):
             code="validation_error",
             fields={field_name: "Ungültiges Datum."},
         ) from exc
+
+
+def _procedure_type(payload):
+    """Eingriffsart from ``procedureTypeId`` or, for older clients, by the name
+    sent as ``procedure``. No type means the full checklist."""
+    type_id = payload.get("procedureTypeId")
+    if type_id not in (None, ""):
+        try:
+            return ProcedureType.objects.get(pk=int(type_id))
+        except (TypeError, ValueError, ProcedureType.DoesNotExist) as exc:
+            raise ApiError(
+                "Unbekannte Eingriffsart.",
+                code="validation_error",
+                fields={"procedureTypeId": "Unbekannte Eingriffsart."},
+            ) from exc
+    name = _clean_text(payload.get("procedure"))
+    return ProcedureType.objects.filter(name__iexact=name).first() if name else None
 
 
 @transaction.atomic
@@ -71,6 +89,7 @@ def create_patient_case(payload):
                 fields={"patientNumber": "Bereits vorhanden."},
             ) from exc
 
+    procedure_type = _procedure_type(payload)
     case = TreatmentCase.objects.create(
         patient=patient,
         case_number=case_number,
@@ -78,7 +97,8 @@ def create_patient_case(payload):
         bene_deputy=_clean_text(payload.get("beneDeputy")),
         surgeon=_clean_text(payload.get("surgeon")),
         op_date=_parse_iso_date(payload.get("opDate")),
-        procedure=_clean_text(payload.get("procedure")),
+        procedure=_clean_text(payload.get("procedure")) or (procedure_type.name if procedure_type else ""),
+        procedure_type=procedure_type,
     )
     create_initial_checklist_state(case)
     record_event(

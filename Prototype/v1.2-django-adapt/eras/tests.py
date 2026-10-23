@@ -1,8 +1,8 @@
-from django.test import SimpleTestCase
+from django.test import TestCase
 from django.urls import reverse
 
 
-class ErasPageTests(SimpleTestCase):
+class ErasPageTests(TestCase):
     def test_home_route_renders_frontpage(self):
         response = self.client.get(reverse("eras:home"))
 
@@ -20,7 +20,7 @@ class ErasPageTests(SimpleTestCase):
         self.assertContains(response, "Zur Patienten")
         self.assertContains(response, "pathway-rail")
         self.assertContains(response, 'id="worklist"')
-        self.assertContains(response, 'eras/js/meeting.js')
+        self.assertContains(response, 'eras/js/worklist.js')
         self.assertContains(response, 'eras/js/questionnaires.js')
         self.assertNotContains(response, 'images/forms/')
         self.assertTemplateUsed(response, "eras/pages/checklist.html")

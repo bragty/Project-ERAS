@@ -42,7 +42,7 @@
       if (caseNumber) {
         const payload = await apiFetch(`/api/cases/${encodeURIComponent(caseNumber)}/state/`);
         window.erasBackend = payload;
-        return { value: JSON.stringify(payload.state), summary: payload.summary, derived: payload.derived, revision: payload.revision };
+        return { value: JSON.stringify(payload.state), summary: payload.summary, derived: payload.derived, validationErrors: payload.validationErrors, revision: payload.revision };
       }
       throw new Error("Checklisten können nur fallbezogen gespeichert werden.");
     },
@@ -59,7 +59,7 @@
           body: JSON.stringify(body)
         });
         window.erasBackend = payload;
-        return { value: JSON.stringify(payload.state), summary: payload.summary, derived: payload.derived, revision: payload.revision };
+        return { value: JSON.stringify(payload.state), summary: payload.summary, derived: payload.derived, validationErrors: payload.validationErrors, revision: payload.revision };
       }
       throw new Error("Checklisten können nur fallbezogen gespeichert werden.");
     },

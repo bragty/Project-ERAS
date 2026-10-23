@@ -5,7 +5,7 @@ from django.db import transaction
 
 from apps.audit.services import record_event
 from apps.core.api import ApiError
-from apps.checklist.engine import default_state, evaluate_state
+from apps.checklist.engine import default_state, evaluate_state, migrate_state
 
 from .models import ChecklistState
 
@@ -44,7 +44,7 @@ def get_state(treatment_case):
         treatment_case=treatment_case,
         defaults={"state": default_state(treatment_case)},
     )
-    normalized, summary, derived, errors = evaluate_state(state_obj.state, treatment_case)
+    normalized, summary, derived, errors = evaluate_state(migrate_state(state_obj.state), treatment_case)
     return state_obj, normalized, summary, derived, errors
 
 
@@ -164,3 +164,20 @@ def reset_state(treatment_case):
         metadata={"revision": state_obj.revision},
     )
     return state_obj, normalized, summary, derived, errors
+
+
+def refresh_checklist_summary(treatment_case):
+    """Recomputes the stored progress after the applicable items changed
+    (Eingriffsart of the case or its configuration). The answers stay as they
+    are, so the revision is not increased."""
+    state_obj = ChecklistState.objects.filter(treatment_case=treatment_case).first()
+    if state_obj is None:
+        return
+    _normalized, summary, _derived, errors = evaluate_state(migrate_state(state_obj.state), treatment_case)
+    ChecklistState.objects.filter(pk=state_obj.pk).update(
+        progress_preop=summary["progressPreop"],
+        progress_path=summary["progressPath"],
+        progress_total=summary["progress"],
+        complete=summary["complete"],
+        validation_errors=errors,
+    )

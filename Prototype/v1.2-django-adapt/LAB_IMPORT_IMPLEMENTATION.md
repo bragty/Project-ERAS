@@ -1,8 +1,3 @@
-# Laborimport: feste KISIM-PDF-Vorlage
-
-Stand: 11.10.2026. Basis: hochgeladene ZIP Project-ERAS_Laborimport_Integrated(1).
-Die Änderungen wurden lokal umgesetzt, nicht auf die VM deployt oder zu GitHub gepusht.
-
 ## Ziel und Format
 
 Der Import unterstützt genau das Tabellenlayout des bereitgestellten Beispiel Labor.pdf:

@@ -4,12 +4,13 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const path=require('node:path');
 function app(){
-  const ctx=vm.createContext({document:{},URLSearchParams,Date});
+  const definition=fs.readFileSync(path.join(__dirname,'../apps/checklist/definition.json'),'utf8');
+  const ctx=vm.createContext({document:{addEventListener(){},getElementById:()=>({textContent:definition})},URLSearchParams,Date});
   vm.runInContext(fs.readFileSync(path.join(__dirname,'static/eras/js/checklist.js'),'utf8'),ctx);
   const run=code=>vm.runInContext(code,ctx);
   run(`let alerts=[];let saves=0;let confirmations=0;
        alert=m=>alerts.push(m);confirm=()=>{confirmations++;return true;};
-       renderChecklist1=()=>{};updateProgress=()=>{};updateFlags=()=>{};scheduleSave=()=>saves++;
+       renderChecklist1=()=>{};updateProgress=()=>{};renderDerived=()=>{};scheduleSave=()=>saves++;
        document.querySelector=()=>({checked:true});
        document.querySelectorAll=()=>[{dataset:{labImportIndex:'0'}}];
        STATE.labs=[];

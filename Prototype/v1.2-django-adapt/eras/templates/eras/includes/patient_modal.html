@@ -16,10 +16,7 @@
           <label class="field"><span>Eingriffsart</span>
             <select id="newProcedure">
               <option value="">Bitte wählen</option>
-              <option>Radikale Zystektomie mit Ileum-Conduit</option>
-              <option>Radikale Zystektomie mit Neoblase</option>
-              <option>Funktionelle Zystektomie</option>
-              <option>Andere Eingriffsart</option>
+              {% for procedure_type in procedure_types %}<option value="{{ procedure_type.pk }}">{{ procedure_type.name }}</option>{% endfor %}
             </select>
           </label>
         </div>

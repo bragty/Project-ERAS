@@ -5,7 +5,7 @@ from django.utils.html import format_html
 
 from apps.audit.services import record_event
 from apps.core.api import ApiError
-from apps.responses.services import create_initial_checklist_state
+from apps.responses.services import create_initial_checklist_state, refresh_checklist_summary
 from apps.workflow.services import archive_case, restore_case
 
 from .models import Patient, TreatmentCase
@@ -13,7 +13,7 @@ from .models import Patient, TreatmentCase
 
 class TreatmentCaseInline(admin.TabularInline):
     model = TreatmentCase
-    fields = ("case_number", "op_date", "procedure", "surgeon", "archived")
+    fields = ("case_number", "op_date", "procedure_type", "procedure", "surgeon", "archived")
     readonly_fields = fields
     extra = 0
     show_change_link = True
@@ -44,28 +44,29 @@ class TreatmentCaseAdmin(admin.ModelAdmin):
         "case_number",
         "patient",
         "op_date",
-        "procedure",
+        "procedure_type",
         "surgeon",
         "bene_nurse",
         "progress",
         "complete",
         "archived",
     )
-    list_filter = ("archived", "checklist_state__complete", "op_date")
+    list_filter = ("archived", "procedure_type", "checklist_state__complete", "op_date")
     search_fields = (
         "case_number",
         "patient__name",
         "patient__patient_number",
         "procedure",
+        "procedure_type__name",
         "surgeon",
         "bene_nurse",
     )
     date_hierarchy = "op_date"
-    list_select_related = ("patient", "checklist_state")
+    list_select_related = ("patient", "checklist_state", "procedure_type")
     autocomplete_fields = ("patient",)
     readonly_fields = ("id", "archived", "archived_at", "checklist_link", "created_at", "updated_at")
     fieldsets = (
-        (None, {"fields": ("patient", "case_number", "op_date", "procedure")}),
+        (None, {"fields": ("patient", "case_number", "op_date", "procedure_type", "procedure")}),
         ("Zuständigkeiten", {"fields": ("surgeon", "bene_nurse", "bene_deputy")}),
         ("Status", {"fields": ("checklist_link", "archived", "archived_at")}),
         ("Technisch", {"classes": ("collapse",), "fields": ("id", "created_at", "updated_at")}),
@@ -100,6 +101,9 @@ class TreatmentCaseAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
         if not change:
             create_initial_checklist_state(obj)
+        elif "procedure_type" in form.changed_data:
+            # Other Eingriffsart, other applicable checklist items.
+            refresh_checklist_summary(obj)
         record_event(
             event_type="case_updated_admin" if change else "case_created_admin",
             treatment_case=obj,
