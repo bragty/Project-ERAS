@@ -6,6 +6,46 @@ Assessment: [Implementierungsbericht Oktober 2026](OCTOBER_2026_IMPLEMENTATION.m
 
 ### Optimierung der Patientenerfassung und Formulare vom 1. November 2026
 
+Die Startseite besitzt eine linke Sidebar mit genau **Übersicht**, **Archiv** und
+**Admin-Einstellungen**. Beide Ansichten verwenden die vorhandene Patiententabelle,
+Vorschau, Bearbeitungs-/Löschdialoge und Archivierungs-/Wiederherstellungsaktionen.
+Auf schmalen Bildschirmen steht die Navigation oberhalb der Tabelle. Der
+Admin-Link verwendet die konfigurierte Django-Admin-Route und deren vorhandenen
+Login. Das Archiv kann direkt mit `/?view=archive` geöffnet werden.
+
+Die Übersicht und das Archiv lassen sich nach vorhandenem/fehlendem OP-Datum,
+inklusivem OP-Zeitraum und Checklistenstatus filtern. Sortiert werden kann nach
+OP-Datum, Progression und Name in beiden Richtungen sowie zuletzt geänderten
+Fällen. Fehlende OP-Daten stehen in beiden Sortierrichtungen am Ende. Fälle ohne
+Checklistenstand gelten für die Progressionsansicht als 0 % / unvollständig.
+Filter und Suche lassen sich kombinieren und gemeinsam zurücksetzen. Alle
+Filter-/Sortierparameter werden serverseitig geprüft. Veraltete Antworten
+laufender Browseranfragen überschreiben keine neu gewählte Ansicht.
+
+**Alle Archivdaten als CSV exportieren** lädt über
+`/api/patients/?archived=true&format=csv` sämtliche archivierten Fälle unabhängig
+von Suche und Filtern herunter. Es werden ausschliesslich gespeicherte Daten
+gelesen: zentrale Patientenstammdaten, Behandlungsfall, Checklisten-Metadaten,
+vollständiger JSON-Stand mit Antworten, Listen, Labor, Notizen, Zuweisungen und
+Altwerten sowie zugehörige Audit-Einträge. Aktive Fälle werden nicht mitexportiert,
+auch wenn sie zum selben Patienten gehören. Der Export wird im Audit protokolliert
+und mit `Cache-Control: no-store` ausgeliefert.
+
+Das CSV verwendet UTF-8 mit BOM und Semikolon als Trennzeichen. Es enthält eine
+Zeile pro gespeichertem Einzelwert mit Patient-/Fallidentität, Datengruppe,
+eindeutigem JSON-Pointer-Feldpfad, Beschriftung, Datentyp und Wert. Listenindizes,
+leere Container und `null` bleiben unterscheidbar; neue oder unbekannte Felder
+werden ebenfalls erfasst. Mehrzeilige Werte werden korrekt in Anführungszeichen
+gesetzt. Potenzielle Tabellenformeln werden mit einem führenden Apostroph als
+Text geschützt. Der Export berechnet keine klinischen Werte neu und verändert
+keine gespeicherten Antworten. Auch ein leeres Archiv liefert eine CSV-Kopfzeile.
+
+Für Sidebar, Filter und Export wurden `eras/pages/home.html`, `frontpage.css`,
+`frontpage.js`, `apps/patients/selectors.py`, `serializers.py` und `api/views.py`
+erweitert; Prüfungen stehen in `apps/patients/tests.py`, `eras/tests.py` und der
+bestehenden `eras/clinical-smoke.py`. Es wurden keine neuen Modelle, Migrationen,
+Routen oder Laufzeitabhängigkeiten eingeführt.
+
 Gespeicherte Patienten können über den Stiftknopf und **Patient löschen** entfernt
 werden. Eine zusätzliche Bestätigung nennt den gespeicherten Namen und die Anzahl
 aller betroffenen Fälle. Erst **Patient endgültig löschen** entfernt den Patienten
@@ -59,13 +99,16 @@ Geänderte bestehende Dateien für diese Optimierung:
 | `eras/static/eras/css/frontpage.css`, `checklist.css` | Einheitliche Ausrichtung und Responsivität |
 | `apps/patients/tests.py`, `apps/checklist/tests_extensions.py`, `tests_rules.py`, `tests_procedure_types.py`, `apps/responses/tests.py`, `eras/checklist.test.cjs`, `clinical-smoke.py` | Neue Prüfungen und Anpassung vorhandener Tests an die strengere API-Validierung |
 
-Verifiziert: **92 Django-Tests (91 erfolgreich, ein optionaler OCR-Test
+Verifiziert: **98 Django-Tests (97 erfolgreich, ein optionaler OCR-Test
 übersprungen), 17 JavaScript-Tests**, Django-Systemprüfung, Migrationsprüfung,
 JavaScript-Syntaxprüfung und `collectstatic` in einem temporären Ausgabeordner.
 Die Chromium-Prüfung verwendet eine temporäre Testdatenbank und deckt Modal,
 Neuerfassung beider Geschlechter, Nachpflege, Korrektur in einem zweiten Tab,
 Abbrechen und Bestätigen der Patientenlöschung,
 Fehlerkorrektur ohne Eingabeverlust und Layout bei 1280, 768, 390 und 320 px ab.
+Zusätzlich sind Sidebar, kombinierte Filter/Sortierung, Archivansicht nach Reload,
+CSV-Download trotz leerer Suchtreffer und Wiederherstellen archivierter Fälle
+geprüft; die Startseite wurde auch bei 1024 px kontrolliert.
 Ein gesonderter Linter/Frontend-Build ist nicht konfiguriert. Fachlich unklare
 medizinische Plausibilitätsschwellen bleiben zur Freigabe offen; vorhandene
 Screeningentscheidungsregeln wurden nicht geändert.
@@ -223,6 +266,7 @@ eras/
 |---|---|---|
 | GET | `/api/health/` | Healthcheck |
 | GET | `/api/patients/?q=&archived=false` | Patienten/Fälle suchen |
+| GET | `/api/patients/?archived=true&format=csv` | Alle archivierten Fall-/Patientendaten strukturiert als CSV exportieren |
 | POST | `/api/patients/` | Patient + Behandlungsfall erfassen |
 | GET | `/api/cases/<fallnummer>/` | Fall laden |
 | PATCH | `/api/cases/<fallnummer>/` | Geänderte Patienten-/Fallstammdaten mit `baseUpdatedAt` speichern |

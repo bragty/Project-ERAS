@@ -28,7 +28,10 @@ class ErasPageTests(TestCase):
     def test_archive_filter_is_available(self):
         response = self.client.get(reverse("eras:home"))
         self.assertContains(response, 'id="archiveFilter"')
-        self.assertContains(response, "Archivierte Fälle")
+        self.assertContains(response, 'id="archiveFilter"')
+        self.assertContains(response, 'id="overviewNav"')
+        self.assertContains(response, 'Admin-Einstellungen')
+        self.assertContains(response, 'id="exportArchiveCsv"')
 
     def test_checklist_without_case_redirects_home(self):
         response = self.client.get(reverse("eras:checklist"))

@@ -137,7 +137,7 @@ isolierte Datenbank des Browserskripts mit einem synthetischen QA-Fall.
 | --- | --- |
 | `python manage.py check` | erfolgreich |
 | `python manage.py makemigrations --check --dry-run` | keine ausstehenden Änderungen |
-| `python manage.py test` | 92 Tests: 91 erfolgreich, 1 bestehender optionaler OCR-Test übersprungen |
+| `python manage.py test` | 98 Tests: 97 erfolgreich, 1 bestehender optionaler OCR-Test übersprungen |
 | `node --check eras/static/eras/js/checklist.js` | erfolgreich |
 | `node --test eras/checklist.test.cjs eras/lab-import.test.cjs eras/definition.test.cjs` | 17 erfolgreich |
 | `python eras/clinical-smoke.py` | erfolgreich: echte Chromium-Bedienung, Modal-/Stammdatenkorrektur, Validierung ohne Eingabeverlust, Persistenz nach Reload, bedingte Felder, Ärzteliste, Checkboxen, MET-Grenzbereich, Stuhlregulation, 1280/768/390/320 px ohne horizontalen Überlauf |

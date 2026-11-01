@@ -1,6 +1,7 @@
 let patients = [];
-let showArchived = false;
+let showArchived = new URLSearchParams(window.location.search).get('view') === 'archive';
 let searchTimer = null;
+let listRequestSerial = 0;
 const PATIENT_FORM_RULES = JSON.parse(document.getElementById('patient-form-rules').textContent);
 const PATIENT_INPUTS = {name:'newPatientName',sex:'newPatientSex',patientNumber:'newPatientNumber',
   caseNumber:'newCaseNumber',opDate:'newOpDate',procedureTypeId:'newProcedure',
@@ -108,7 +109,7 @@ function tableHeaderHTML(){
 function renderSearchResults(){
   const results = document.getElementById("patientSearchResults");
   const query = document.getElementById("patientSearch").value.trim();
-  const label = query ? `${patients.length} Treffer` : (showArchived ? "Archivierte Fälle" : "Aktive Fälle");
+  const label = `${showArchived?'Archivierte Fälle':'Aktive Fälle'} · ${patients.length} ${query?'Treffer':'Fälle'}`;
   results.innerHTML = `
     <div class="search-results-head">${esc(label)}</div>
     <div class="patient-table search-table">
@@ -118,22 +119,75 @@ function renderSearchResults(){
   `;
 }
 
+function patientListParams(){
+  const from=document.getElementById('opDateFrom'), to=document.getElementById('opDateTo');
+  const missing=document.getElementById('opDateStatus').value==='missing';
+  from.disabled=missing;to.disabled=missing;
+  let error='';
+  if(!missing&&(from.validity.badInput||to.validity.badInput))error='Bitte gültige OP-Daten eingeben.';
+  if(!missing&&from.value&&to.value&&from.value>to.value)error='Das Enddatum muss am oder nach dem Startdatum liegen.';
+  const output=document.getElementById('patientFilterError');
+  output.textContent=error;output.hidden=!error;
+  to.setAttribute('aria-invalid',String(!!error));
+  if(error)return null;
+  const params=new URLSearchParams({archived:String(showArchived),sort:document.getElementById('patientSort').value,
+    opStatus:document.getElementById('opDateStatus').value,progressStatus:document.getElementById('progressStatus').value});
+  const query=document.getElementById('patientSearch').value.trim();
+  if(query)params.set('q',query);
+  if(!missing&&from.value)params.set('opFrom',from.value);
+  if(!missing&&to.value)params.set('opTo',to.value);
+  return params;
+}
+
+function resetPatientFilters({keepSearch=false,reload=true}={}){
+  if(!keepSearch)document.getElementById('patientSearch').value='';
+  for(const [id,value] of Object.entries({opDateStatus:'all',opDateFrom:'',opDateTo:'',progressStatus:'all',patientSort:'op_asc'}))document.getElementById(id).value=value;
+  patientListParams();
+  if(reload)loadPatients();
+}
+
+function updateListView(){
+  document.getElementById('patientListTitle').textContent=showArchived?'Archivierte Patienten':'Patientenübersicht';
+  document.getElementById('patientListDescription').textContent=showArchived?'Archivierte Fälle öffnen, wiederherstellen oder vollständig als CSV exportieren.':'Patient auswählen oder neuen Patienten erfassen.';
+  document.getElementById('archiveExport').hidden=!showArchived;
+  document.getElementById('overviewNav').toggleAttribute('aria-current',!showArchived);
+  document.getElementById('archiveFilter').toggleAttribute('aria-current',showArchived);
+  const active=document.getElementById(showArchived?'archiveFilter':'overviewNav');
+  active.setAttribute('aria-current','page');
+}
+
+function setArchiveView(archived){
+  if(showArchived===archived)return;
+  showArchived=archived;
+  updateListView();
+  patients=[];
+  updatePreview(null);
+  renderSearchResults();
+  const url=new URL(window.location.href);
+  if(archived)url.searchParams.set('view','archive');else url.searchParams.delete('view');
+  url.searchParams.delete('edit');
+  window.history.replaceState(null,'',url.pathname+url.search);
+  loadPatients();
+}
+
 async function loadPatients(options){
   const background = !!(options && options.background);
   const results = document.getElementById("patientSearchResults");
-  const query = document.getElementById("patientSearch").value.trim();
+  const params=patientListParams();
+  if(!params)return;
+  const signature=params.toString();
+  const requestSerial=++listRequestSerial;
   try {
-    const params = new URLSearchParams({ archived: String(showArchived) });
-    if (query) params.set("q", query);
     const payload = await window.erasApi.fetch(`/api/patients/?${params.toString()}`);
-    // A background refresh must not overwrite results of a newer search.
-    if (background && query !== document.getElementById("patientSearch").value.trim()) return;
+    // Discard stale responses after any search, filter, sort or view change.
+    if(requestSerial!==listRequestSerial||patientListParams()?.toString()!==signature)return;
     const next = payload.results || [];
     // Re-render only on changes, so focus/hover in the table is not disturbed.
     if (background && JSON.stringify(next) === JSON.stringify(patients)) return;
     patients = next;
     renderSearchResults();
   } catch (err) {
+    if(requestSerial!==listRequestSerial||patientListParams()?.toString()!==signature)return;
     if (background) return;
     patients = [];
     results.innerHTML = `<div class="empty-results">${esc(err.message || "Patienten konnten nicht geladen werden.")}</div>`;
@@ -231,6 +285,14 @@ async function savePatient(event){
     updatePreview(payload.case);
     patientSaving=false;
     closeModal(true);
+    resetPatientFilters({keepSearch:true,reload:false});
+    if(showArchived!==payload.case.archived){
+      showArchived=payload.case.archived;
+      updateListView();
+      const url=new URL(window.location.href);
+      if(showArchived)url.searchParams.set('view','archive');else url.searchParams.delete('view');
+      window.history.replaceState(null,'',url.pathname+url.search);
+    }
     await loadPatients();
   } catch (err) {
     document.getElementById('patientForm').inert=false;
@@ -402,13 +464,12 @@ document.getElementById("patientSearch").addEventListener("input", () => {
 document.getElementById("patientSearchResults").addEventListener("click", handlePatientRowClick);
 document.getElementById("patientSearchResults").addEventListener("keydown", handlePatientRowKeydown);
 
-document.getElementById("archiveFilter").addEventListener("click", async event => {
-  showArchived = !showArchived;
-  event.target.textContent = showArchived ? "Aktive Fälle" : "Archivierte Fälle";
-  event.target.setAttribute("aria-pressed", String(showArchived));
-  await loadPatients();
-});
+document.getElementById('archiveFilter').addEventListener('click',()=>setArchiveView(true));
+document.getElementById('overviewNav').addEventListener('click',()=>setArchiveView(false));
+document.getElementById('resetPatientFilters').addEventListener('click',()=>resetPatientFilters());
+['opDateStatus','opDateFrom','opDateTo','progressStatus','patientSort'].forEach(id=>document.getElementById(id).addEventListener('change',()=>loadPatients()));
 
+updateListView();
 loadPatients();
 const editCase=new URLSearchParams(window.location.search).get('edit');
 if(editCase) window.erasApi.fetch(`/api/cases/${encodeURIComponent(editCase)}/`).then(payload=>openModal(payload.case)).catch(err=>alert(err.message));

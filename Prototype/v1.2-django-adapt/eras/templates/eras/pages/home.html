@@ -1,18 +1,27 @@
 {% extends "eras/base.html" %}
 {% load static %}
 
-{% block extra_css %}<link rel="stylesheet" href="{% static 'eras/css/frontpage.css' %}?v=20261101-delete-patient">{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'eras/css/frontpage.css' %}?v=20261101-sidebar">{% endblock %}
 
 {% block header %}{% include "eras/includes/frontpage_header.html" %}{% endblock %}
 
 {% block content %}
 <main class="main">
-    <div class="wrap">
+  <div class="workspace-layout">
+    <aside class="sidebar" aria-label="Hauptnavigation">
+      <span class="sidebar-label">BENE Plattform</span>
+      <nav>
+        <button type="button" class="sidebar-link" id="overviewNav" aria-current="page"><span aria-hidden="true">▦</span>Übersicht</button>
+        <button type="button" class="sidebar-link" id="archiveFilter"><span aria-hidden="true">▣</span>Archiv</button>
+        <a class="sidebar-link" href="{% url 'admin:index' %}"><span aria-hidden="true">⚙</span>Admin-Einstellungen</a>
+      </nav>
+    </aside>
+    <div class="workspace-content">
       <section class="selection-card">
         <div class="selection-top">
           <div>
-            <h2>Patientenübersicht</h2>
-            <p>Patient auswählen oder neuen Patienten erfassen.</p>
+            <h2 id="patientListTitle">Patientenübersicht</h2>
+            <p id="patientListDescription">Patient auswählen oder neuen Patienten erfassen.</p>
           </div>
           <div class="status-pill">BENE aktiv</div>
         </div>
@@ -22,7 +31,21 @@
             <span>Patientenauswahl</span>
             <input id="patientSearch" type="search" placeholder="Name, Fallnummer, Patientennummer oder Eingriff suchen" autocomplete="off">
           </label>
-          <button type="button" class="btn" id="archiveFilter">Archivierte Fälle</button><button type="button" class="btn primary" id="newPatientBtn">Neu Patient erfassen</button>
+          <button type="button" class="btn primary" id="newPatientBtn">Neu Patient erfassen</button>
+        </div>
+
+        <div class="patient-filters" aria-label="Patienten filtern und sortieren">
+          <label class="field"><span>OP-Datum</span><select id="opDateStatus"><option value="all">Alle Fälle</option><option value="dated">Mit OP-Datum</option><option value="missing">Ohne OP-Datum</option></select></label>
+          <label class="field"><span>OP-Datum von</span><input type="date" id="opDateFrom" aria-describedby="patientFilterError"></label>
+          <label class="field"><span>OP-Datum bis</span><input type="date" id="opDateTo" aria-describedby="patientFilterError"></label>
+          <label class="field"><span>Progression</span><select id="progressStatus"><option value="all">Alle Stände</option><option value="open">Unvollständig</option><option value="complete">Abgeschlossen</option><option value="not_started">Noch nicht begonnen (0 %)</option></select></label>
+          <label class="field"><span>Sortieren nach</span><select id="patientSort"><option value="op_asc">OP-Datum: frühestes zuerst</option><option value="op_desc">OP-Datum: spätestes zuerst</option><option value="progress_asc">Progression: aufsteigend</option><option value="progress_desc">Progression: absteigend</option><option value="name_asc">Name: A–Z</option><option value="name_desc">Name: Z–A</option><option value="updated_desc">Zuletzt geänderte zuerst</option></select></label>
+          <button type="button" class="btn" id="resetPatientFilters">Filter zurücksetzen</button>
+        </div>
+        <p class="field-error" id="patientFilterError" role="alert" hidden></p>
+        <div class="archive-export" id="archiveExport" hidden>
+          <div><strong>Archiv exportieren</strong><p>Alle archivierten Fälle mit Stammdaten, Checklisten und zugehörigem Audit-Protokoll – unabhängig von den gesetzten Filtern.</p></div>
+          <a class="btn" id="exportArchiveCsv" href="{% url 'patients_api:patients' %}?archived=true&amp;format=csv" download>Alle Archivdaten als CSV exportieren</a>
         </div>
 
         <div class="search-results" id="patientSearchResults" aria-live="polite"></div>
@@ -35,8 +58,9 @@
         </div>
       </section>
     </div>
+  </div>
   </main>
 {% include "eras/includes/patient_modal.html" %}
 {% endblock %}
 
-{% block extra_js %}<script src="{% static 'eras/js/frontpage.js' %}?v=20261101-delete-patient" defer></script>{% endblock %}
+{% block extra_js %}<script src="{% static 'eras/js/frontpage.js' %}?v=20261101-sidebar" defer></script>{% endblock %}

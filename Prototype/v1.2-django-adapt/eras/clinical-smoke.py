@@ -3,6 +3,8 @@
 Run from the project directory: python eras/clinical-smoke.py
 """
 import os
+import csv
+import io
 from pathlib import Path
 import socket
 import subprocess
@@ -29,9 +31,16 @@ def main():
         from django.core.management import call_command
         from django.db import connections
         from apps.patients.models import Patient, TreatmentCase
+        from apps.responses.models import ChecklistState
         call_command('migrate', verbosity=0, interactive=False)
         TreatmentCase.objects.create(patient=Patient.objects.create(name='Synthetic Browser QA'),
                                      case_number='BROWSER-QA', op_date='2026-11-10')
+        sort_case=TreatmentCase.objects.create(patient=Patient.objects.create(name='Sort QA',sex='female'),case_number='BROWSER-SORT',op_date='2026-11-05')
+        ChecklistState.objects.create(treatment_case=sort_case,progress_total=80)
+        for suffix in ('A','B'):
+            archived=TreatmentCase.objects.create(patient=Patient.objects.create(name='Archived QA '+suffix,sex='female'),case_number='ARCHIVE-QA-'+suffix,archived=True,op_date='2026-10-03')
+            ChecklistState.objects.create(treatment_case=archived,complete=True,progress_total=100,
+                                          state={'notes':{'t1:diagnosen':'CSV QA;\nNotiz'},'labs':[{'type':'Hb','value':'124','unit':'g/l'}]})
         with socket.socket() as sock:
             sock.bind(('127.0.0.1', 0))
             port = sock.getsockname()[1]
@@ -120,6 +129,57 @@ def main():
                     expect(modal).not_to_have_class('modal-backdrop open')
                     expect(page.locator('[data-case-number="BROWSER-EXTRA"]')).to_have_count(0)
                     expect(page.locator('[data-case-number="BROWSER-MALE"]')).to_have_count(1)
+                    # The original overview and row actions coexist with the sidebar.
+                    expect(page.locator('.sidebar nav').locator('button,a')).to_have_count(3)
+                    expect(page.get_by_role('link',name='Admin-Einstellungen')).to_have_attribute('href','/admin/')
+                    page.locator('#patientSort').select_option('progress_desc')
+                    expect(page.locator('[data-case-number]').first).to_have_attribute('data-case-number','BROWSER-SORT')
+                    page.locator('#opDateStatus').select_option('missing')
+                    expect(page.locator('[data-case-number]')).to_have_count(2)
+                    page.locator('#patientSearch').fill('female')
+                    expect(page.locator('[data-case-number]')).to_have_count(1)
+                    expect(page.locator('[data-case-number]')).to_have_attribute('data-case-number','BROWSER-FEMALE')
+                    page.locator('#resetPatientFilters').click()
+                    page.locator('#opDateFrom').fill('2026-11-06')
+                    page.locator('#opDateTo').fill('2026-11-10')
+                    page.locator('#opDateTo').press('Tab')
+                    expect(page.locator('[data-case-number]')).to_have_count(1)
+                    expect(page.locator('[data-case-number]')).to_have_attribute('data-case-number','BROWSER-QA')
+                    page.locator('#opDateFrom').fill('2026-11-11')
+                    page.locator('#opDateFrom').press('Tab')
+                    expect(page.locator('#patientFilterError')).to_contain_text('Enddatum')
+                    page.locator('#resetPatientFilters').click()
+                    for width in (1280,1024,768,390,320):
+                        page.set_viewport_size({'width':width,'height':1000})
+                        assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), f'Overview overflow at {width}px'
+                        if os.getenv('BENE_QA_SCREENSHOTS'):
+                            page.screenshot(path=str(Path(os.environ['BENE_QA_SCREENSHOTS'])/f'overview-{width}.png'),full_page=True)
+                    page.set_viewport_size({'width':1280,'height':900})
+                    page.locator('#archiveFilter').click()
+                    expect(page.locator('#patientListTitle')).to_have_text('Archivierte Patienten')
+                    expect(page.locator('[data-case-number]')).to_have_count(2)
+                    expect(page.locator('#archiveFilter')).to_have_attribute('aria-current','page')
+                    # Export is explicitly all archived cases, even with a search yielding none.
+                    page.locator('#patientSearch').fill('no matching case')
+                    expect(page.locator('[data-case-number]')).to_have_count(0)
+                    with page.expect_download() as download_info:
+                        page.locator('#exportArchiveCsv').click()
+                    download=download_info.value
+                    data=Path(download.path()).read_text(encoding='utf-8-sig')
+                    exported=list(csv.DictReader(io.StringIO(data),delimiter=';'))
+                    assert {row['Fallnummer'] for row in exported}=={'ARCHIVE-QA-A','ARCHIVE-QA-B'}
+                    assert any(row['Wert']=='CSV QA;\nNotiz' for row in exported)
+                    page.locator('#resetPatientFilters').click()
+                    page.reload()
+                    expect(page.locator('#patientListTitle')).to_have_text('Archivierte Patienten')
+                    expect(page.locator('[data-case-number]')).to_have_count(2)
+                    if os.getenv('BENE_QA_SCREENSHOTS'):
+                        page.screenshot(path=str(Path(os.environ['BENE_QA_SCREENSHOTS'])/'archive-1280.png'),full_page=True)
+                    page.locator('[data-archive-case="ARCHIVE-QA-A"]').click()
+                    expect(page.locator('[data-case-number]')).to_have_count(1)
+                    page.locator('#overviewNav').click()
+                    expect(page.locator('[data-case-number="ARCHIVE-QA-A"]')).to_have_count(1)
+                    expect(page.locator('#archiveExport')).to_be_hidden()
                     # Unknown legacy patient: no inference from any old questionnaire.
                     page.goto(origin+'/checklist/?case=BROWSER-QA')
                     prostate = page.locator('[data-fkey="untersuchung_prostata"]')
@@ -213,7 +273,7 @@ def main():
                                 page.locator(f'.item[data-id="t1:{section}"]').screenshot(path=str(target/f'{section}-{width}.png'))
                     assert not errors, errors
                     browser.close()
-                print('Browser QA passed: modal, sex creation/correction, validation, persistence, screenings and 1280/768/390/320px layouts.')
+                print('Browser QA passed: sidebar, filters, archive, CSV download, restore, modal, patient data, screenings and responsive layouts.')
             finally:
                 server.terminate()
                 server.wait(timeout=10)

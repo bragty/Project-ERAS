@@ -3,8 +3,8 @@ from django.views.decorators.http import require_http_methods
 
 from apps.core.api import ApiError, error_response, ok, parse_json_body
 
-from ..selectors import treatment_case_by_number, treatment_cases
-from ..serializers import case_to_dict
+from ..selectors import treatment_case_by_number, treatment_cases, case_query_options
+from ..serializers import case_to_dict, archived_cases_csv
 from ..services import create_patient_case, update_patient_case, delete_patient
 
 
@@ -16,9 +16,14 @@ def _parse_archived(value):
 def patients_collection(request):
     try:
         if request.method == "GET":
+            if request.GET.get("format") == "csv":
+                if not _parse_archived(request.GET.get("archived")):
+                    raise ApiError("Der CSV-Export ist für das Archiv vorgesehen.", status=422, code="validation_error")
+                return archived_cases_csv(treatment_cases(archived=True))
             cases = treatment_cases(
                 query=request.GET.get("q", ""),
                 archived=_parse_archived(request.GET.get("archived")),
+                **case_query_options(request.GET),
             )
             return ok({"results": [case_to_dict(case) for case in cases]})
 
