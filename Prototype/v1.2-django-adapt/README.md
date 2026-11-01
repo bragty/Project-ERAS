@@ -1,5 +1,75 @@
 ## Serverseitig
 
+Erweiterungen für Untersuchung, Anamnese, Stuhlregulation und kardiologisches
+Assessment: [Implementierungsbericht Oktober 2026](OCTOBER_2026_IMPLEMENTATION.md)
+(Datenfelder, Migration, Regeln, Tests und offene fachliche Fragen).
+
+### Optimierung der Patientenerfassung und Formulare vom 1. November 2026
+
+Gespeicherte Patienten können über den Stiftknopf und **Patient löschen** entfernt
+werden. Eine zusätzliche Bestätigung nennt den gespeicherten Namen und die Anzahl
+aller betroffenen Fälle. Erst **Patient endgültig löschen** entfernt den Patienten
+mit seinen Fällen und Checklisten; Abbrechen erhält auch noch ungespeicherte
+Formulareingaben. Audit-Ereignisse bleiben erhalten. Eine signierte, zeitlich
+begrenzte Bestätigung verhindert Löschungen bei inzwischen geänderten Stammdaten,
+neuen Fällen oder geänderten Checklisten. Es wurde keine weitere Migration oder
+Route benötigt: Die bestehende Fall-Detailroute unterstützt jetzt auch `DELETE`.
+
+- Geschlecht wird zentral in `Patient.sex` gespeichert und bei Neuerfassung
+  verlangt. Bestandsdaten bleiben ohne automatische Zuordnung. Nachpflege und
+  Korrekturen erfolgen über **Stammdaten bearbeiten** im bestehenden Modal.
+  Geschlechtsspezifische Felder und die STOP-BANG-Geschlechtsantwort folgen den
+  Stammdaten; alte Antworten und ausgeblendete Werte bleiben erhalten.
+- Hintergrundklick und Escape schliessen die Patientenerfassung nicht.
+  Bei geänderten Eingaben bieten X und Abbrechen **Weiterbearbeiten** bzw.
+  **Ohne Speichern schliessen**. Tab-Fokus bleibt im Dialog; Navigation mit noch
+  ungespeicherten Eingaben wird durch den üblichen Browserhinweis geschützt.
+- Neue technisch ungültige Zahlen, Auswahlwerte und Kalenderdaten werden über
+  die bestehende API mit Feldfehlern zurückgewiesen. Die Eingaben bleiben zur
+  Korrektur sichtbar. Unveränderte ungültige Altwerte werden nicht gelöscht und
+  blockieren die Speicherung anderer Felder nicht. Fehlende Pflichtangaben
+  dürfen weiterhin als unvollständiger Entwurf gespeichert werden.
+- Bestehende Scoregrenzen und Messwertschritte kommen weiterhin aus
+  `definition.json`; es wurden keine neuen medizinischen Obergrenzen eingeführt.
+  Messgrössen ohne festgelegten Dezimalschritt erlauben Dezimalwerte, NRS bleibt
+  ganzzahlig. Troponin und Körpertemperatur erlauben keine negativen Werte.
+  Geburtsdatum, manuelles Alter, Telefon und E-Mail sind im bestehenden Modell
+  nicht vorhanden und wurden nicht zusätzlich eingeführt. Daher gibt es auch
+  keine neue Altersberechnung oder erfundene Alters-/Plausibilitätsschwelle.
+- Gemeinsame Grid-Strukturen richten Labels, Eingaben und reservierte
+  Fehlerzeilen aus; Checkboxen, dynamische Listen und mobile Ansichten bleiben
+  im bisherigen Design.
+
+Die zusätzliche Migration `patients/0003_patient_sex.py` fügt nur das optionale
+Bestandsdatenfeld hinzu; die Pflicht bei Neuerfassung liegt in API und Admin.
+Die bestehenden Fall-Detailrouten unterstützen jetzt zusätzlich `PATCH` mit
+`baseUpdatedAt` als Schutz vor veralteten Änderungen. Es gibt keine neue Route,
+neues Modell oder neue Laufzeitabhängigkeit. Der Browser sendet nur tatsächlich
+geänderte Stammdaten. Korrekturen werden auditiert und über die bestehenden
+Revisionen an offene Checklisten weitergegeben.
+
+Geänderte bestehende Dateien für diese Optimierung:
+
+| Dateien | Zweck |
+| --- | --- |
+| `apps/patients/models.py`, `services.py`, `serializers.py`, `api/views.py`, `admin.py` | Zentrales Geschlecht, Validierung, sichere Nachpflege und Audit |
+| `eras/views.py`, `templates/eras/includes/patient_modal.html`, `static/eras/js/frontpage.js` | Bestehendes Modal, Änderungsbestätigung und Feldfehler |
+| `apps/checklist/definition.json`, `engine.py`, `apps/responses/services.py` | Gemeinsame Feldregeln, zentrale Kontext-/Scoreberechnung, technische Speicherprüfung |
+| `eras/static/eras/js/checklist.js`, `questionnaires.js`, `templates/eras/includes/checklist_header.html` | Sichtbarkeit, bearbeitbare Entwürfe und Fehleranzeige |
+| `eras/static/eras/css/frontpage.css`, `checklist.css` | Einheitliche Ausrichtung und Responsivität |
+| `apps/patients/tests.py`, `apps/checklist/tests_extensions.py`, `tests_rules.py`, `tests_procedure_types.py`, `apps/responses/tests.py`, `eras/checklist.test.cjs`, `clinical-smoke.py` | Neue Prüfungen und Anpassung vorhandener Tests an die strengere API-Validierung |
+
+Verifiziert: **92 Django-Tests (91 erfolgreich, ein optionaler OCR-Test
+übersprungen), 17 JavaScript-Tests**, Django-Systemprüfung, Migrationsprüfung,
+JavaScript-Syntaxprüfung und `collectstatic` in einem temporären Ausgabeordner.
+Die Chromium-Prüfung verwendet eine temporäre Testdatenbank und deckt Modal,
+Neuerfassung beider Geschlechter, Nachpflege, Korrektur in einem zweiten Tab,
+Abbrechen und Bestätigen der Patientenlöschung,
+Fehlerkorrektur ohne Eingabeverlust und Layout bei 1280, 768, 390 und 320 px ab.
+Ein gesonderter Linter/Frontend-Build ist nicht konfiguriert. Fachlich unklare
+medizinische Plausibilitätsschwellen bleiben zur Freigabe offen; vorhandene
+Screeningentscheidungsregeln wurden nicht geändert.
+
 - Patienten und Behandlungsfälle werden in der Django-Datenbank gespeichert.
 - Die Patientenübersicht lädt/sucht Fälle über eine REST-artige JSON-API.
 - Das Erfassen eines Patienten/Falls erfolgt über die API.
@@ -155,6 +225,8 @@ eras/
 | GET | `/api/patients/?q=&archived=false` | Patienten/Fälle suchen |
 | POST | `/api/patients/` | Patient + Behandlungsfall erfassen |
 | GET | `/api/cases/<fallnummer>/` | Fall laden |
+| PATCH | `/api/cases/<fallnummer>/` | Geänderte Patienten-/Fallstammdaten mit `baseUpdatedAt` speichern |
+| DELETE | `/api/cases/<fallnummer>/` | Patienten mit allen Fällen/Checklisten nach expliziter Bestätigung (`confirmedPatientId`, signierter `deletionToken` aus dem Detail-GET) löschen |
 | GET | `/api/cases/<fallnummer>/state/` | Checklistenstatus laden |
 | PUT | `/api/cases/<fallnummer>/state/` | Checklistenstatus autospeichern (optional `baseRevision`, sonst 409 bei Konflikt) |
 | GET | `/api/cases/<fallnummer>/state/revision/` | aktuelle Revision für Live-Aktualisierung |

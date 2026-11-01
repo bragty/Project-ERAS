@@ -61,9 +61,9 @@ class ChecklistStateApiTests(TestCase):
         state["checked"]["t1:vitalparameter"] = True
         response = self.client.put(self.state_url(), data=json.dumps({"state": state}), content_type="application/json")
         payload = response.json()
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(payload["state"]["checked"].get("t1:vitalparameter", False))
-        self.assertIn("t1:vitalparameter", payload["validationErrors"])
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("vital_spo2", payload["error"]["fields"]["t1:vitalparameter"])
+        self.assertNotIn("vital_spo2", ChecklistState.objects.get(treatment_case=self.case).state.get("answers",{}))
 
     def test_archive_is_blocked_until_checklist_complete(self):
         response = self.client.post(reverse("workflow_api:case-archive", kwargs={"case_number": self.case.case_number}), data="{}", content_type="application/json")
@@ -73,9 +73,9 @@ class ChecklistStateApiTests(TestCase):
     def test_schema_endpoint_reports_current_counts(self):
         response = self.client.get(reverse("checklist_api:schema"))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["counts"]["preop"], 24)
+        self.assertEqual(response.json()["counts"]["preop"], 29)
         self.assertEqual(response.json()["counts"]["path"], 93)
-        self.assertEqual(response.json()["counts"]["total"], 117)
+        self.assertEqual(response.json()["counts"]["total"], 122)
 
     def revision_url(self):
         return reverse("responses_api:case-state-revision", kwargs={"case_number": self.case.case_number})

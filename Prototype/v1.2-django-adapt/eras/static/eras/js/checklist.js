@@ -76,19 +76,43 @@ function allItemIds(){
   return preopItemIds().concat(pathItemIds());
 }
 
+function patientSexAnswer(){return {male:'1',female:'0'}[DERIVED.patientSex] ?? '';}
+function isMalePatient(){return DERIVED.patientSex === 'male';}
+
+function physiciansHTML(key){
+  const rows = Array.isArray(STATE.answers[key]) ? STATE.answers[key] : [];
+  return `<div class="dynamic-list">${rows.map((row, index)=>`<div class="dynamic-row physician-row">
+    <label class="field"><span>Fachrichtung</span><input maxlength="2000" data-doctor-field="specialty" data-doctor-index="${index}" data-doctor-key="${key}" value="${esc(row?.specialty)}"></label>
+    <label class="field"><span>Name</span><input maxlength="2000" data-doctor-field="name" data-doctor-index="${index}" data-doctor-key="${key}" value="${esc(row?.name)}"></label>
+    <button type="button" class="icon-btn" data-remove-doctor="${index}" data-doctor-key="${key}" aria-label="Arzt entfernen">×</button>
+  </div>`).join('')}<button type="button" class="add-row-btn" data-add-doctor="${key}">+ Behandelnden Arzt hinzufügen</button></div>`;
+}
+
 function fieldsHTML(fields){
   return `<div class="fields">${fields.map(f=>{
     const val = STATE.answers[f.key];
+    const error = Object.values(ITEM_ERRORS).map(e=>e[f.key]).find(Boolean);
+    const message = `<small class="field-error" data-field-error="${f.key}" aria-live="polite">${esc(error||'')}</small>`;
+    const label = esc(f.label)+(f.optional ? ' (optional)' : '');
+    const wrapper = f.maleOnly ? ` data-male-field ${isMalePatient()?'':'hidden'}` : '';
+    if (f.key === 'stopbang_sex') return `<label class="field"><span>${label}</span><output data-patient-sex>${esc(patientSexAnswer()===''?'Nicht erfasst – Stammdaten nachpflegen':isMalePatient()?'Ja':'Nein')}</output></label>`;
+    if (f.type === 'physicians') return `<div class="field field-wide"><span>${label}</span>${physiciansHTML(f.key)}${message}</div>`;
+    if (f.type === 'multiselect') return `<fieldset class="field field-wide"><legend>${label}</legend>${f.options.map(o=>{
+      const value=typeof o==='object'?o.value:o, text=typeof o==='object'?o.label:o;
+      return `<label class="clinical-check"><input type="checkbox" data-multi-key="${f.key}" value="${esc(value)}" ${Array.isArray(val)&&val.includes(value)?'checked':''}>${esc(text)}</label>`;
+    }).join('')}${message}</fieldset>`;
+    if (f.type === 'checkbox') return `<label class="field clinical-check"><input type="checkbox" data-checkbox-key="${f.key}" ${val==='Ja'?'checked':''}>${label}${message}</label>`;
+    if (f.type === 'textarea') return `<label class="field field-wide"${wrapper}><span>${label}</span><textarea rows="2" maxlength="2000" data-fkey="${f.key}">${esc(val)}</textarea>${message}</label>`;
     if (f.type === "select"){
       const opts = ['<option value="">–</option>'].concat(
         f.options.map(o => { const value=typeof o==="object" ? o.value : o; const label=typeof o==="object" ? o.label : o; return `<option value="${esc(value)}" ${String(val)===String(value)?"selected":""}>${esc(label)}</option>`; })
       );
-      return `<label class="field"><span>${esc(f.label)}</span><select data-fkey="${f.key}">${opts.join("")}</select></label>`;
+      return `<label class="field"${wrapper}><span>${label}</span><select data-fkey="${f.key}">${opts.join("")}</select>${message}</label>`;
     }
     const minAttr = f.min!==undefined ? ` min="${f.min}"` : "";
     const maxAttr = f.max!==undefined ? ` max="${f.max}"` : "";
     const stepAttr = f.step!==undefined ? ` step="${f.step}"` : "";
-    return `<label class="field"><span>${esc(f.label)}</span><input type="${f.type}" data-fkey="${f.key}" value="${esc(val ?? "")}" placeholder="${esc(f.placeholder||"")}"${minAttr}${maxAttr}${stepAttr}${f.readonly?' readonly aria-readonly="true"':''}></label>`;
+    return `<label class="field"${wrapper}><span>${label}</span><input type="${f.type==='number'?'text':f.type}" ${f.type==='number'?'inputmode="decimal"':''} maxlength="2000" data-fkey="${f.key}" value="${esc(val ?? "")}" placeholder="${esc(f.placeholder||"")}"${minAttr}${maxAttr}${stepAttr}${f.readonly?' readonly aria-readonly="true"':''}>${message}</label>`;
   }).join("")}</div>`;
 }
 
@@ -283,6 +307,8 @@ function suchtRowsHTML(){
 }
 
 function customHTML(kind){
+  if (kind === 'cardiac') return '<div class="clinical-guidance" data-cardiac-result aria-live="polite"></div>';
+  if (kind === 'bowel') return '<div class="clinical-guidance" data-bowel-result aria-live="polite"></div>';
   if (kind === "labs") return labRowsHTML();
   if (kind === "suchtmittel") return suchtRowsHTML();
   return "";
@@ -328,7 +354,7 @@ function itemErrorsHTML(id, fields){
     const field = fields.find(f => f.key === key);
     return `<li>${field ? `${esc(field.label)}: ` : ""}${esc(message)}</li>`;
   });
-  return `<div class="item-errors" role="alert"><strong>Kann nicht abgehakt werden:</strong><ul>${lines.join("")}</ul></div>`;
+  return `<div class="item-errors" role="alert"><strong>Angaben prüfen:</strong><ul>${lines.join("")}</ul></div>`;
 }
 
 function dividerHTML(label, id){
@@ -464,6 +490,20 @@ function attachHandlers(){
       scheduleSave();
       return;
     }
+    const doctorButton = e.target.closest('[data-add-doctor], [data-remove-doctor]');
+    if (doctorButton){
+      const key = doctorButton.dataset.addDoctor || doctorButton.dataset.doctorKey;
+      const rows = Array.isArray(STATE.answers[key]) ? STATE.answers[key] : [];
+      if (doctorButton.hasAttribute('data-add-doctor')){
+        if (rows.length >= 50) return;
+        rows.push({specialty:'',name:''});
+      } else rows.splice(Number(doctorButton.dataset.removeDoctor),1);
+      STATE.answers[key] = rows;
+      invalidateConfirmations(itemIdsUsingField(key));
+      rerenderFromState();
+      scheduleSave();
+      return;
+    }
     const addSucht = e.target.closest('[data-add-sucht]');
     if (addSucht){
       STATE.suchtmittel.push({substance:"", frequency:"", note:""});
@@ -503,6 +543,25 @@ function attachHandlers(){
   });
 
   document.body.addEventListener('input', (e) => {
+    const doctor = e.target.closest('[data-doctor-field]');
+    if (doctor){
+      if (!STATE.answers[doctor.dataset.doctorKey][Number(doctor.dataset.doctorIndex)] || typeof STATE.answers[doctor.dataset.doctorKey][Number(doctor.dataset.doctorIndex)] !== 'object') STATE.answers[doctor.dataset.doctorKey][Number(doctor.dataset.doctorIndex)] = {};
+      STATE.answers[doctor.dataset.doctorKey][Number(doctor.dataset.doctorIndex)][doctor.dataset.doctorField] = doctor.value;
+      invalidateConfirmations(itemIdsUsingField(doctor.dataset.doctorKey));
+      scheduleSave();
+      return;
+    }
+    const structured = e.target.closest('[data-multi-key], [data-checkbox-key]');
+    if (structured){
+      const key = structured.dataset.multiKey || structured.dataset.checkboxKey;
+      if (structured.dataset.multiKey){
+        STATE.answers[key] = [...document.querySelectorAll(`[data-multi-key="${key}"]:checked`)].map(el=>el.value);
+      } else STATE.answers[key] = structured.checked ? 'Ja' : 'Nein';
+      invalidateConfirmations(itemIdsUsingField(key));
+      scheduleSave();
+      renderDerived();
+      return;
+    }
     const previewField = e.target.closest('[data-lab-preview-field]');
     if (previewField && LAB_IMPORT_PREVIEW){
       const item = LAB_IMPORT_PREVIEW.suggestions?.[Number(previewField.dataset.labPreviewIndex)];
@@ -580,7 +639,7 @@ function attachHandlers(){
   });
 
   document.getElementById('pname').addEventListener('input', e => { STATE.patientName = e.target.value; scheduleSave(); });
-  document.getElementById('opdate').addEventListener('input', e => { STATE.opDate = e.target.value; scheduleSave(); });
+  document.getElementById('opdate').addEventListener('input', e => { STATE.opDate = e.target.value; scheduleSave(); renderDerived(); });
 
   document.getElementById('printBtn').addEventListener('click', () => window.print());
   document.getElementById('resetBtn').addEventListener('click', () => {
@@ -698,6 +757,19 @@ function renderProgress(ids, pctId, segId){
 
 // Shows the last server result; nothing here decides anything itself.
 function renderDerived(){
+  document.querySelectorAll('[data-male-field]').forEach(el=>{ el.hidden = !isMalePatient(); });
+  document.querySelectorAll('[data-patient-sex]').forEach(el=>{el.textContent=patientSexAnswer()===''?'Nicht erfasst – Stammdaten nachpflegen':isMalePatient()?'Ja':'Nein';});
+  const context=document.getElementById('patientContext');
+  if(context) context.innerHTML=`Geschlecht: ${esc({male:'Männlich',female:'Weiblich'}[DERIVED.patientSex]||'nicht erfasst – bitte nachpflegen')} · <a href="/?edit=${encodeURIComponent(currentCaseNumber())}">Stammdaten bearbeiten</a>`;
+  document.querySelectorAll('[data-cardiac-result]').forEach(el=>{
+    const result = DERIVED.cardiac;
+    el.classList.toggle('clinical-warning', result?.status === 'consult');
+    el.innerHTML = result ? `<strong>${esc(result.message)}</strong><p>Ausgewählte Risikofaktoren: ${esc(result.riskCount ?? 'nicht beurteilbar')}${result.riskAssessmentComplete?' (vollständig überprüft)':' (Beurteilung offen)'}</p>${[...(result.reasons||[]), ...(result.pending||[])].map(t=>`<p>${esc(t)}</p>`).join('')}<small>Fachliche Prüfung und bestehender Freigabeprozess erforderlich. Keine automatische Konsilanordnung.</small>` : 'Screening noch nicht ausgewertet.';
+  });
+  document.querySelectorAll('[data-bowel-result]').forEach(el=>{
+    const result = DERIVED.bowel;
+    el.innerHTML = result ? `<strong>Klinisch zu prüfende Vorgabe</strong><p>${esc(result.message)}</p><p>${result.startDate ? 'Geplanter Beginn: '+esc(result.startDate) : 'OP-Datum zur Berechnung des Beginns ergänzen.'}</p>` : 'Obstipationsstatus und OP-Datum erfassen; fachliche Prüfung erforderlich.';
+  });
   updateQuestionnaireResults();
   const bmi = document.getElementById('bmi');
   if (bmi) bmi.textContent = DERIVED.bmi != null ? DERIVED.bmi.toFixed(1) + ' kg/m²' : 'Grösse und Gewicht erfassen';
@@ -713,12 +785,64 @@ function renderDerived(){
     if (document.activeElement !== field) field.value = STATE.answers[key] ?? '';
     const filled = !!field.value;
     // checkValidity only applies the field's own min/max/step from the definition.
-    const invalid = refused.has(key) || (filled && !field.checkValidity());
+    const localMessage = checklistFieldMessage(field);
+    const invalid = !!localMessage || refused.has(key);
     field.classList.toggle('invalid', invalid || (filled && flagged.has(key)));
     field.classList.toggle('valid', filled && !invalid && !flagged.has(key));
     field.setAttribute('aria-invalid', String(invalid));
+    const output=field.closest('.field')?.querySelector('[data-field-error]');
+    if(output) output.textContent=localMessage||Object.values(ITEM_ERRORS).map(e=>e[key]).find(Boolean)||'';
+  });
+  const opdate=document.getElementById('opdate');
+  const opError=document.getElementById('opdateError');
+  if(opdate&&opError){const message=operationDateMessage(opdate.value);opError.textContent=message;opdate.setAttribute('aria-invalid',String(!!message));}
+  document.querySelectorAll('[data-lab-idx]').forEach(field=>{
+    const key=`lab:${field.dataset.labIdx}:${field.dataset.labKey}`;
+    const message=ITEM_ERRORS['t1:laborwerte']?.[key]||'';
+    let output=field.parentElement.querySelector('.field-error');
+    if(!output){output=document.createElement('small');output.className='field-error';output.setAttribute('aria-live','polite');field.after(output);}
+    output.textContent=message;field.setAttribute('aria-invalid',String(!!message));
+  });
+  document.querySelectorAll('[data-referral][data-property="date"]').forEach(field=>{
+    const message=ITEM_ERRORS.referrals?.[field.dataset.referral]||'';
+    let output=field.parentElement.querySelector('.field-error');
+    if(!output){output=document.createElement('small');output.className='field-error';field.after(output);}
+    output.textContent=message;field.setAttribute('aria-invalid',String(!!message));
   });
   renderWorklist();
+}
+
+function validISODate(value){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(value)||value.startsWith('0000'))return false;
+  const date=new Date(value+'T12:00:00Z');
+  return Number.isFinite(date.getTime())&&date.toISOString().slice(0,10)===value;
+}
+function operationDateMessage(value){
+  if(!value.trim())return '';
+  const match=/^(\d{2})\.(\d{2})\.(\d{4})$/.exec(value.trim());
+  const iso=match?`${match[3]}-${match[2]}-${match[1]}`:value.trim();
+  return validISODate(iso)?'':'Bitte ein gültiges OP-Datum als TT.MM.JJJJ oder JJJJ-MM-TT eingeben.';
+}
+function checklistFieldMessage(field){
+  const spec=CHECKLIST_DEFINITION.fields[field.dataset.fkey];
+  if(!spec||spec.readonly||(spec.maleOnly&&!isMalePatient()))return '';
+  const value=field.value.trim();
+  if(field.validity?.badInput)return 'Bitte einen gültigen Wert eingeben.';
+  if(!value)return '';
+  if(spec.type==='number'){
+    const number=Number(value);
+    if(!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(value)||!Number.isFinite(number))return 'Es wird ein Zahlenwert erwartet.';
+    if(spec.min!==undefined&&number<Number(spec.min))return `Wert muss mindestens ${spec.min} sein.`;
+    if(spec.max!==undefined&&number>Number(spec.max))return `Wert darf höchstens ${spec.max} sein.`;
+    if(spec.step&&spec.step!=='any'){
+      const ratio=(number-Number(spec.min||0))/Number(spec.step);
+      if(Math.abs(ratio-Math.round(ratio))>1e-7)return `Wert muss in Schritten von ${spec.step} angegeben werden.`;
+    }
+  }
+  if(spec.type==='date'&&!validISODate(value))return 'Ungültiges Datum.';
+  if(spec.type==='select'&&!spec.options.some(o=>String(typeof o==='object'?o.value:o)===value))return 'Ungültige Auswahl.';
+  if(['text','textarea'].includes(spec.type)&&value.length>2000)return 'Text mit höchstens 2000 Zeichen erwartet.';
+  return '';
 }
 
 function scheduleSave(){
@@ -801,7 +925,7 @@ function applyServerResult(res, base){
   const remote = serverState(res);
   DERIVED = res.derived || {};
   const refused = res.validationErrors || {};
-  Object.assign(ITEM_ERRORS, refused);
+  ITEM_ERRORS = refused;
   const changed = adoptRemoteState(base || remote, remote);
   Object.keys(ITEM_ERRORS).forEach(id => { if (STATE.checked[id]) delete ITEM_ERRORS[id]; });
   if (!changed){
@@ -814,9 +938,9 @@ function captureUIState(){
   const ui = { focus:null, notes:[], referrals:[] };
   const el = document.activeElement;
   if (el && el !== document.body){
-    const attrs = ['data-fkey','data-notekey','data-lab-idx','data-lab-key','data-sucht-idx','data-sucht-key','data-referral','data-property'];
+    const attrs = ['data-fkey','data-doctor-key','data-doctor-index','data-doctor-field','data-multi-key','data-checkbox-key','data-notekey','data-lab-idx','data-lab-key','data-sucht-idx','data-sucht-key','data-referral','data-property'];
     const selector = el.id ? '#'+CSS.escape(el.id)
-      : attrs.filter(a => el.hasAttribute(a)).map(a => `[${a}="${CSS.escape(el.getAttribute(a))}"]`).join('');
+      : attrs.filter(a => el.hasAttribute(a)).map(a => `[${a}="${CSS.escape(el.getAttribute(a))}"]`).join('') + (el.hasAttribute('data-multi-key') ? `[value="${CSS.escape(el.value)}"]` : '');
     if (selector){
       ui.focus = { selector, index:[...document.querySelectorAll(selector)].indexOf(el) };
       try{ ui.focus.start = el.selectionStart; ui.focus.end = el.selectionEnd; }catch(_){ /* not a text field */ }
@@ -913,6 +1037,13 @@ function startLiveSync(){
 
 async function saveState(){
   if (SYNC.saving){ SYNC.resave = true; return; }
+  const invalid=[...document.querySelectorAll('[data-fkey]')].some(field=>
+    checklistFieldMessage(field)&&!deepEqual(STATE.answers[field.dataset.fkey],SYNC.base?.answers?.[field.dataset.fkey]));
+  if(invalid||(operationDateMessage(STATE.opDate||'')&&STATE.opDate!==SYNC.base?.opDate)){
+    renderDerived();
+    document.getElementById('saveState').textContent='Nicht gespeichert – markierte Felder prüfen';
+    return;
+  }
   SYNC.saving = true;
   const sent = cloneValue(STATE);
   try{
@@ -933,6 +1064,10 @@ async function saveState(){
         document.getElementById('saveState').textContent = 'Speichern fehlgeschlagen — bitte Eingaben notieren';
         console.error('Storage error', pullErr);
       }
+    }else if(err.status===422){
+      ITEM_ERRORS=err.payload?.error?.fields||{};
+      document.getElementById('saveState').textContent='Nicht gespeichert – markierte Felder prüfen';
+      rerenderFromState();
     }else{
       document.getElementById('saveState').textContent = 'Speichern fehlgeschlagen — bitte Eingaben notieren';
       console.error('Storage error', err);
@@ -989,4 +1124,7 @@ function caseStorageKey(){
 document.addEventListener('DOMContentLoaded', () => {
   attachHandlers();
   loadState();
+  window.addEventListener('beforeunload',event=>{
+    if(SYNC.base&&(SYNC.saving||saveTimer||!deepEqual(withoutLocalOnly(STATE),withoutLocalOnly(SYNC.base)))){event.preventDefault();event.returnValue='';}
+  });
 });

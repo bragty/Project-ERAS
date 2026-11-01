@@ -1,0 +1,224 @@
+"""Optional browser regression: playwright + chromium; isolated temporary DB only.
+
+Run from the project directory: python eras/clinical-smoke.py
+"""
+import os
+from pathlib import Path
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+from urllib.request import urlopen
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+
+def main():
+    from playwright.sync_api import sync_playwright, expect
+
+    with tempfile.TemporaryDirectory(prefix='bene-clinical-qa-') as folder:
+        # Explicitly replace all DB configuration; never use the user's database.
+        os.environ.pop('POSTGRES_DB', None)
+        os.environ.update(SQLITE_PATH=str(Path(folder) / 'qa.sqlite3'),
+                          DJANGO_SETTINGS_MODULE='eras_project.settings', DJANGO_ENV='development',
+                          DJANGO_DEBUG='true', DJANGO_ALLOWED_HOSTS='127.0.0.1,localhost')
+        import django
+        django.setup()
+        from django.core.management import call_command
+        from django.db import connections
+        from apps.patients.models import Patient, TreatmentCase
+        call_command('migrate', verbosity=0, interactive=False)
+        TreatmentCase.objects.create(patient=Patient.objects.create(name='Synthetic Browser QA'),
+                                     case_number='BROWSER-QA', op_date='2026-11-10')
+        with socket.socket() as sock:
+            sock.bind(('127.0.0.1', 0))
+            port = sock.getsockname()[1]
+        origin = f'http://127.0.0.1:{port}'
+        with open(Path(folder) / 'server.log', 'w') as log:
+            server = subprocess.Popen([sys.executable, 'manage.py', 'runserver', f'127.0.0.1:{port}', '--noreload'],
+                                      cwd=ROOT, env=os.environ.copy(), stdout=log, stderr=log)
+            try:
+                for _ in range(100):
+                    try:
+                        urlopen(origin+'/api/health/', timeout=1).close()
+                        break
+                    except OSError:
+                        time.sleep(.1)
+                with sync_playwright() as pw:
+                    browser = pw.chromium.launch()
+                    page = browser.new_page(viewport={'width':1280, 'height':900})
+                    errors = []
+                    page.on('pageerror', lambda error: errors.append(str(error)))
+                    page.goto(origin+'/')
+                    modal=page.locator('#patientModal')
+                    page.locator('#newPatientBtn').click()
+                    page.locator('#closePatientModal').click()
+                    expect(modal).not_to_have_class('modal-backdrop open')
+                    page.locator('#newPatientBtn').click()
+                    page.locator('#newPatientName').fill('Ungespeicherte QA Eingabe')
+                    page.mouse.click(3,3)
+                    expect(modal).to_have_class('modal-backdrop open')
+                    page.keyboard.press('Escape')
+                    expect(modal).to_have_class('modal-backdrop open')
+                    page.locator('#closePatientModal').click()
+                    expect(page.locator('#patientDiscardConfirmation')).to_be_visible()
+                    page.locator('#continuePatientEditing').click()
+                    expect(page.locator('#newPatientName')).to_have_value('Ungespeicherte QA Eingabe')
+                    page.locator('#cancelPatientModal').click()
+                    page.locator('#discardPatientChanges').click()
+                    expect(modal).not_to_have_class('modal-backdrop open')
+                    # Shared modal layout, long labels, reserved error rows and Tab loop.
+                    page.locator('#newPatientBtn').click()
+                    page.locator('#savePatient').click()
+                    for width in (1280,768,390,320):
+                        page.set_viewport_size({'width':width,'height':900})
+                        assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), f'Modal overflow at {width}px'
+                        if os.getenv('BENE_QA_SCREENSHOTS'):
+                            target=Path(os.environ['BENE_QA_SCREENSHOTS'])
+                            target.mkdir(parents=True,exist_ok=True)
+                            page.locator('.modal').screenshot(path=str(target/f'patient-modal-{width}.png'))
+                    page.set_viewport_size({'width':1280,'height':900})
+                    page.locator('#savePatient').focus()
+                    page.keyboard.press('Tab')
+                    expect(page.locator('#closePatientModal')).to_be_focused()
+                    page.locator('#closePatientModal').click()
+                    for sex in ('male','female'):
+                        page.locator('#newPatientBtn').click()
+                        expect(page.locator('#deletePatient')).to_be_hidden()
+                        page.locator('#savePatient').click()
+                        expect(page.locator('#newPatientSexError')).to_contain_text('auswählen')
+                        page.locator('#newPatientName').fill('Synthetic '+sex+' QA')
+                        page.locator('#newCaseNumber').fill('BROWSER-'+sex.upper())
+                        page.locator('#newPatientSex').select_option(sex)
+                        page.locator('#savePatient').click()
+                        expect(modal).not_to_have_class('modal-backdrop open')
+                        expect(page.locator('#patientSearchResults')).to_contain_text('Synthetic '+sex+' QA')
+                    page.locator('#newPatientBtn').click()
+                    page.locator('#newPatientName').fill('Duplicate QA')
+                    page.locator('#newCaseNumber').fill('BROWSER-MALE')
+                    page.locator('#newPatientSex').select_option('male')
+                    page.locator('#savePatient').click()
+                    expect(page.locator('#newCaseNumberError')).to_contain_text('Bereits vorhanden')
+                    expect(page.locator('#newPatientName')).to_have_value('Duplicate QA')
+                    page.locator('#newCaseNumber').fill('BROWSER-EXTRA')
+                    page.locator('#savePatient').click()
+                    expect(modal).not_to_have_class('modal-backdrop open')
+                    # Deletion always requires its own explicit confirmation.
+                    page.locator('[data-edit-case="BROWSER-EXTRA"]').click()
+                    expect(page.locator('#deletePatient')).to_be_visible()
+                    page.locator('#newPatientName').fill('Unsaved local name')
+                    page.locator('#deletePatient').click()
+                    expect(page.locator('#patientDeleteDescription')).to_contain_text('Duplicate QA')
+                    page.keyboard.press('Escape')
+                    expect(page.locator('#patientDeleteConfirmation')).to_be_visible()
+                    page.locator('#cancelPatientDelete').click()
+                    expect(page.locator('#newPatientName')).to_have_value('Unsaved local name')
+                    page.locator('#deletePatient').click()
+                    page.locator('#confirmPatientDelete').click()
+                    expect(modal).not_to_have_class('modal-backdrop open')
+                    expect(page.locator('[data-case-number="BROWSER-EXTRA"]')).to_have_count(0)
+                    expect(page.locator('[data-case-number="BROWSER-MALE"]')).to_have_count(1)
+                    # Unknown legacy patient: no inference from any old questionnaire.
+                    page.goto(origin+'/checklist/?case=BROWSER-QA')
+                    prostate = page.locator('[data-fkey="untersuchung_prostata"]')
+                    expect(prostate).to_be_hidden()
+                    expect(page.locator('#patientContext')).to_contain_text('nicht erfasst')
+                    page.locator('#patientContext a').click()
+                    page.locator('#newPatientSex').select_option('male')
+                    page.locator('#savePatient').click()
+                    expect(modal).not_to_have_class('modal-backdrop open')
+                    page.goto(origin+'/checklist/?case=BROWSER-QA')
+                    expect(prostate).to_be_visible()
+                    expect(page.locator('[data-fkey="stopbang_sex"]')).to_have_count(0)
+                    number=page.locator('[data-fkey="vital_gewicht"]')
+                    for invalid in ('-1','abc','NaN'):
+                        number.fill(invalid)
+                        number.blur()
+                        expect(number).to_have_value(invalid)
+                        expect(number).to_have_attribute('aria-invalid','true')
+                        expect(page.locator('#saveState')).to_contain_text('Nicht gespeichert')
+                    number.fill('250.5')
+                    expect(number).to_have_attribute('aria-invalid','false')
+                    page.locator('#opdate').fill('31.02.2026')
+                    expect(page.locator('#opdateError')).to_contain_text('gültiges OP-Datum')
+                    expect(page.locator('#opdate')).to_have_value('31.02.2026')
+                    page.locator('#opdate').fill('2026-11-10')
+                    expect(page.locator('#opdateError')).to_be_empty()
+                    page.locator('[data-lab-key="type"]').first.select_option('Hb')
+                    lab=page.locator('[data-lab-key="value"]').first
+                    lab.fill('-1')
+                    page.locator('[data-lab-key="unit"]').first.fill('g/l')
+                    expect(page.locator('#saveState')).to_contain_text('Nicht gespeichert')
+                    expect(lab).to_have_value('-1')
+                    expect(lab.locator('..').locator('.field-error')).to_contain_text('Nichtnegativen')
+                    lab.fill('<124')
+                    expect(page.locator('#saveState')).to_contain_text('Automatisch gespeichert')
+                    expect(lab.locator('..').locator('.field-error')).to_be_empty()
+                    prostate.fill('35.5')
+                    page.locator('[data-fkey="anamnese_allergien"]').fill('QA Allergie')
+                    page.locator('[data-add-doctor]').click()
+                    page.locator('[data-doctor-field="specialty"]').fill('Urologie')
+                    page.locator('[data-doctor-field="name"]').fill('QA Arzt')
+                    page.locator('[data-fkey="stuhl_obstipation"]').select_option('Ja')
+                    page.locator('[data-checkbox-key="stuhl_rezept"]').check()
+                    expect(page.locator('[data-bowel-result]')).to_contain_text('2 Beutel')
+                    expect(page.locator('[data-bowel-result]')).to_contain_text('2026-11-07')
+                    page.locator('[data-fkey="kardio_akut"]').select_option('Nein')
+                    page.locator('[data-fkey="kardio_met"]').select_option('gt4')
+                    page.locator('[data-fkey="kardio_risiken_beurteilt"]').select_option('Ja')
+                    risks = page.locator('[data-multi-key="kardio_risiken"]')
+                    for index in range(4):
+                        risks.nth(index).check()
+                    expect(page.locator('[data-cardiac-result]')).to_contain_text('Kardiologisches Konsil gemäss')
+                    expect(page.locator('[data-cardiac-result]')).to_contain_text('4 (vollständig überprüft)')
+                    expect(page.locator('#saveState')).not_to_contain_text('speichere')
+                    page.reload()
+                    expect(prostate).to_have_value('35.5')
+                    expect(page.locator('[data-doctor-field="name"]')).to_have_value('QA Arzt')
+                    expect(page.locator('[data-fkey="anamnese_allergien"]')).to_have_value('QA Allergie')
+                    expect(page.locator('[data-checkbox-key="stuhl_rezept"]')).to_be_checked()
+                    expect(risks.nth(3)).to_be_checked()
+                    page.locator('[data-fkey="kardio_met"]').select_option('around4')
+                    expect(page.locator('[data-cardiac-result]')).to_contain_text('MET um 4 fachlich abklären')
+                    page.locator('[data-fkey="stuhl_obstipation"]').select_option('Unbekannt')
+                    expect(page.locator('[data-bowel-result]')).to_contain_text('keine Dosierung ausgewählt')
+                    # A correction in another browser tab updates the open form.
+                    expect(page.locator('#saveState')).not_to_contain_text('speichere')
+                    editor=browser.new_page()
+                    editor.goto(origin+'/?edit=BROWSER-QA')
+                    editor.locator('#newPatientSex').select_option('female')
+                    editor.locator('#savePatient').click()
+                    expect(editor.locator('#patientModal')).not_to_have_class('modal-backdrop open')
+                    page.bring_to_front()
+                    expect(prostate).to_be_hidden(timeout=15000)
+                    editor.goto(origin+'/?edit=BROWSER-QA')
+                    editor.locator('#newPatientSex').select_option('male')
+                    editor.locator('#savePatient').click()
+                    expect(editor.locator('#patientModal')).not_to_have_class('modal-backdrop open')
+                    page.bring_to_front()
+                    expect(prostate).to_be_visible(timeout=15000)
+                    expect(prostate).to_have_value('35.5')
+                    editor.close()
+                    for width in (1280, 768, 390, 320):
+                        page.set_viewport_size({'width':width, 'height':900})
+                        assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), f'Overflow at {width}px'
+                        if os.getenv('BENE_QA_SCREENSHOTS'):
+                            target = Path(os.environ['BENE_QA_SCREENSHOTS'])
+                            target.mkdir(parents=True, exist_ok=True)
+                            page.screenshot(path=str(target/f'clinical-{width}.png'), full_page=True)
+                            page.locator('.chart-strip').screenshot(path=str(target/f'patient-header-{width}.png'))
+                            for section in ('untersuchung', 'anamnese-aerzte', 'kardio', 'stuhlregulation'):
+                                page.locator(f'.item[data-id="t1:{section}"]').screenshot(path=str(target/f'{section}-{width}.png'))
+                    assert not errors, errors
+                    browser.close()
+                print('Browser QA passed: modal, sex creation/correction, validation, persistence, screenings and 1280/768/390/320px layouts.')
+            finally:
+                server.terminate()
+                server.wait(timeout=10)
+                connections.close_all()
+
+
+if __name__ == '__main__':
+    main()

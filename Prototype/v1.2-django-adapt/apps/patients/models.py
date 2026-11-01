@@ -9,6 +9,12 @@ class Patient(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     patient_number = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    class Sex(models.TextChoices):
+        MALE = "male", "Männlich"
+        FEMALE = "female", "Weiblich"
+
+    # Blank is reserved for legacy patients; never infer from a name/screening.
+    sex = models.CharField("Geschlecht", max_length=6, choices=Sex.choices, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -47,8 +53,8 @@ class TreatmentCase(models.Model):
     class Meta:
         ordering = ["op_date", "case_number"]
         indexes = [
-            models.Index(fields=["archived", "op_date"]),
-            models.Index(fields=["case_number"]),
+            models.Index(fields=["archived", "op_date"], name="patients_tr_archive_3fe7c8_idx"),
+            models.Index(fields=["case_number"], name="patients_tr_case_nu_a6ad2c_idx"),
         ]
 
     def __str__(self):

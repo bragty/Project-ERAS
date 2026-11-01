@@ -90,7 +90,7 @@ class ProcedureTypeChecklistTests(TestCase):
         def create(case_number, **payload):
             return self.client.post(
                 reverse("patients_api:patients"),
-                data=json.dumps({"name": "Neu", "caseNumber": case_number, **payload}),
+                data=json.dumps({"name": "Neu", "sex": "female", "caseNumber": case_number, **payload}),
                 content_type="application/json",
             )
 

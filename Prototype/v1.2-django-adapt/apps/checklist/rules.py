@@ -8,6 +8,7 @@ The engine applies them on every save; the frontend only displays the results
 from __future__ import annotations
 
 import calendar
+import math
 from dataclasses import dataclass
 from datetime import date
 from typing import Callable
@@ -17,7 +18,8 @@ def as_number(value):
     if value is None or value == "":
         return None
     try:
-        return float(value)
+        number = float(value)
+        return number if math.isfinite(number) else None
     except (TypeError, ValueError):
         return None
 
@@ -55,6 +57,8 @@ REQUIRED_IF: dict[str, Callable[[dict], bool]] = {
 
 
 def field_required(key, spec, answers):
+    if spec.get("maleOnly") and answers.get("stopbang_sex") != "1":
+        return False
     if spec.get("optional"):
         return False
     condition = REQUIRED_IF.get(key)
@@ -87,6 +91,78 @@ def _kardio(a):
     return (ef is not None and ef < 50) or (mmrc is not None and mmrc >= 3)
 
 
+@dataclass(frozen=True)
+class CardiacScreeningConfig:
+    risk_threshold: int = 3  # strictly more than three, per supplied specification
+    low_met: tuple[str, ...] = ("lt4",)
+    adequate_met: tuple[str, ...] = ("gt4",)
+
+
+CARDIAC_SCREENING = CardiacScreeningConfig()
+CARDIAC_CONSULT_MESSAGE = "Kardiologisches Konsil gemäss hinterlegter Screeningregel indiziert."
+
+
+def cardiac_assessment(answers, config=CARDIAC_SCREENING):
+    # Validate against the shared definition: malformed answers cannot produce
+    # either a reassuring result or a fabricated number of risk factors.
+    from .definition import base_definition, option_value
+    fields = base_definition()["fields"]
+    def choices(key):
+        raw = answers.get(key, [])
+        allowed = {option_value(o) for o in fields[key]["options"]}
+        if not isinstance(raw, list):
+            return set(), False
+        known = {v for v in raw if isinstance(v, str) and v in allowed}
+        # Keep recognized positive categories visible even in a malformed draft.
+        return known, len(known) == len(raw)
+    categories, categories_valid = choices("kardio_kategorien")
+    risks, risks_valid = choices("kardio_risiken")
+    acute, met = answers.get("kardio_akut"), answers.get("kardio_met")
+    reasons, pending = [], []
+    if acute == "Ja" or categories:
+        reasons.append("Akut symptomatische Herzerkrankung / positive Kategorie")
+    if met in config.low_met:
+        reasons.append("MET < 4")
+    if met in config.adequate_met and risks_valid and len(risks) > config.risk_threshold:
+        reasons.append("Mehr als drei kardiale Risikofaktoren")
+    if acute not in ("Ja", "Nein"):
+        pending.append("Akute Herzerkrankungen nicht abschliessend beurteilt.")
+    if not categories_valid or (categories and acute != "Ja"):
+        pending.append("Hauptantwort und Herzerkrankungskategorien abgleichen.")
+    if acute == "Ja" and not categories:
+        pending.append("Kategorie der akuten Herzerkrankung ergänzen.")
+    if met not in config.low_met + config.adequate_met:
+        pending.append("MET um 4 fachlich abklären." if met == "around4" else "MET nicht abschliessend beurteilt.")
+    if answers.get("kardio_risiken_beurteilt") != "Ja" or not risks_valid:
+        pending.append("Kardiale Risikofaktoren vollständig überprüfen.")
+    return {
+        "status": "consult" if reasons else "review" if pending else "no_recommendation",
+        "riskCount": len(risks) if risks_valid else None,
+        "riskAssessmentComplete": answers.get("kardio_risiken_beurteilt") == "Ja" and risks_valid,
+        "reasons": reasons, "pending": pending,
+        "message": CARDIAC_CONSULT_MESSAGE if reasons else "Abklärung / Vervollständigung erforderlich." if pending else "Keine automatische Konsilempfehlung aus den ergänzten Screeningregeln.",
+    }
+
+
+def bowel_guidance(answers, op_date):
+    from datetime import datetime, timedelta
+    status = answers.get("stuhl_obstipation")
+    start = None
+    for fmt in ("%Y-%m-%d", "%d.%m.%Y"):
+        try:
+            start = (datetime.strptime(op_date, fmt).date() - timedelta(days=3)).isoformat()
+            break
+        except (TypeError, ValueError):
+            pass
+    dose = 2 if status == "Ja" else 1 if status == "Nein" else None
+    return {
+        "status": "review" if dose is None else "ready_for_review",
+        "startDate": start,
+        "message": (f"Movicol: {dose} Beutel am Morgen. Beginn drei Tage präoperativ. Keine Einnahme am Operationstag."
+                    if dose else "Obstipationsstatus klären; keine Dosierung ausgewählt. Beginn drei Tage präoperativ; keine Einnahme am Operationstag."),
+    }
+
+
 def _tropo(a):
     pre, day1, day2 = (as_number(a.get(key)) for key in ("tropo_preop", "tropo_tag1", "tropo_tag2"))
     if pre is not None:
@@ -99,6 +175,11 @@ def _tropo(a):
 
 
 FLAG_RULES = {
+    "cardiac_screening": FlagRule(
+        lambda a: cardiac_assessment(a)["status"] == "consult",
+        CARDIAC_CONSULT_MESSAGE,
+        ("kardio_akut", "kardio_met", "kardio_risiken"),
+    ),
     "pneumo": FlagRule(
         _pneumo,
         "STOP-BANG ≥3 oder Epworth ≥11 → Zuweisung Pneumologie zur OSAS-Abklärung empfohlen.",
@@ -195,9 +276,10 @@ REFERRALS = [
     ),
     Referral(
         "kardio", "Kardiologie",
-        lambda a, flags, today: flags["kardio"],
+        lambda a, flags, today: flags["kardio"] or flags["cardiac_screening"],
         lambda a, labs: f"Bitte um präoperative kardiale Abklärung gemäss Weisung. EF: {_value(a, 'kardio_ef')} %. "
-        f"mMRC: {_value(a, 'score_mmrc')}.",
+        f"mMRC: {_value(a, 'score_mmrc')}. "
+        + cardiac_assessment(a)["message"] + " " + "; ".join(cardiac_assessment(a)["reasons"]),
     ),
     Referral(
         "rauchstopp", "Rauchstopp",

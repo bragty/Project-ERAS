@@ -5,7 +5,7 @@ from apps.core.api import ApiError, error_response, ok, parse_json_body
 
 from ..selectors import treatment_case_by_number, treatment_cases
 from ..serializers import case_to_dict
-from ..services import create_patient_case
+from ..services import create_patient_case, update_patient_case, delete_patient
 
 
 def _parse_archived(value):
@@ -29,10 +29,16 @@ def patients_collection(request):
         return error_response(exc)
 
 
-@require_http_methods(["GET"])
+@require_http_methods(["GET", "PATCH", "DELETE"])
 def case_detail(request, case_number):
     try:
         case = treatment_case_by_number(case_number)
+        if request.method == "PATCH":
+            case = update_patient_case(case, parse_json_body(request))
+        elif request.method == "DELETE":
+            return ok(delete_patient(case, parse_json_body(request)))
     except ObjectDoesNotExist:
         return error_response(ApiError("Fall nicht gefunden.", status=404, code="case_not_found"))
-    return ok({"case": case_to_dict(case)})
+    except ApiError as exc:
+        return error_response(exc)
+    return ok({"case": case_to_dict(case, include_deletion=True)})

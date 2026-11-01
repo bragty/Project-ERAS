@@ -10,6 +10,7 @@ class PatientApiTests(TestCase):
     def create_case(self, **overrides):
         payload = {
             "name": "Muster Anna",
+            "sex": "female",
             "patientNumber": "P-10021",
             "caseNumber": "F-78342",
             "opDate": "2026-08-14",
@@ -96,3 +97,151 @@ class PatientApiTests(TestCase):
         self.assertContains(response, "Nicht archiviert")
         case.refresh_from_db()
         self.assertFalse(case.archived)
+
+    def test_sex_is_required_and_only_supported_values_are_accepted(self):
+        for value in ('', None, 'unknown', 1, [], {}):
+            with self.subTest(value=value):
+                response=self.create_case(sex=value)
+                self.assertEqual(response.status_code,422)
+                self.assertIn('sex',response.json()['error']['fields'])
+        payload={'name':'QA','caseNumber':'F-NOSEX'}
+        response=self.client.post(reverse('patients_api:patients'),data=json.dumps(payload),content_type='application/json')
+        self.assertEqual(response.status_code,422)
+        self.assertEqual(Patient.objects.count(),0)
+
+    def test_male_and_female_are_saved_and_loaded_centrally(self):
+        for sex in ('male','female'):
+            response=self.create_case(sex=sex,name='QA '+sex,patientNumber='QA-'+sex,caseNumber='F-'+sex)
+            self.assertEqual(response.status_code,201)
+            case=TreatmentCase.objects.get(case_number='F-'+sex)
+            self.assertEqual(case.patient.sex,sex)
+            loaded=self.client.get(reverse('patients_api:case-detail',kwargs={'case_number':case.case_number}))
+            self.assertEqual(loaded.json()['case']['sex'],sex)
+
+    def test_conflicting_sex_on_second_case_never_overwrites_patient(self):
+        self.create_case(sex='female')
+        response=self.create_case(caseNumber='SECOND',sex='male')
+        self.assertEqual(response.status_code,409)
+        self.assertEqual(Patient.objects.get().sex,'female')
+        self.assertEqual(TreatmentCase.objects.count(),1)
+
+    def test_invalid_dates_and_text_limits_fail_without_creating_records(self):
+        for changes in ({'opDate':'2026-02-30'}, {'opDate':'20261101'}, {'opDate':True},
+                        {'name':' '}, {'name':'x'*256}, {'patientNumber':'x'*65},
+                        {'caseNumber':'x'*65}, {'beneNurse':{}}, {'surgeon':'x'*256}):
+            with self.subTest(changes=changes):
+                self.assertEqual(self.create_case(**changes).status_code,422)
+                self.assertEqual(Patient.objects.count(),0)
+
+    def test_legacy_patient_can_be_corrected_without_changing_saved_answers(self):
+        from apps.responses.models import ChecklistState
+        patient=Patient.objects.create(name='Legacy',patient_number='LEGACY')
+        cases=[TreatmentCase.objects.create(patient=patient,case_number='LEGACY-'+str(i)) for i in range(2)]
+        original={'answers':{'stopbang_sex':'1','untersuchung_prostata':'35.5','anamnese_erektion':'Original'},
+                  'notes':{'t1:diagnosen':'Original'}}
+        for case in cases:
+            ChecklistState.objects.create(treatment_case=case,state=original)
+        state_url=reverse('responses_api:case-state',kwargs={'case_number':cases[0].case_number})
+        self.assertEqual(self.client.get(state_url).json()['derived']['patientSex'],'')
+        url=reverse('patients_api:case-detail',kwargs={'case_number':cases[0].case_number})
+        for sex in ('male','female','male'):
+            before=self.client.get(url).json()['case']
+            response=self.client.patch(url,data=json.dumps({'sex':sex,'baseUpdatedAt':before['updatedAt']}),content_type='application/json')
+            self.assertEqual(response.status_code,200)
+            for case in cases:
+                case.patient.refresh_from_db()
+                state=ChecklistState.objects.get(treatment_case=case)
+                self.assertEqual(state.state,original)
+                self.assertEqual(case.patient.sex,sex)
+            self.assertEqual(self.client.get(state_url).json()['derived']['patientSex'],sex)
+        before=self.client.get(url).json()['case']
+        self.assertEqual(self.client.patch(url,data=json.dumps({'sex':'','baseUpdatedAt':before['updatedAt']}),content_type='application/json').status_code,422)
+
+    def test_edit_uses_revision_and_preserves_unedited_fields(self):
+        self.create_case()
+        case=TreatmentCase.objects.get()
+        url=reverse('patients_api:case-detail',kwargs={'case_number':case.case_number})
+        before=self.client.get(url).json()['case']
+        response=self.client.patch(url,data=json.dumps({'sex':'male','baseUpdatedAt':before['updatedAt']}),content_type='application/json')
+        self.assertEqual(response.status_code,200)
+        case.refresh_from_db()
+        self.assertEqual(case.surgeon,'Dr. Meier')
+        self.assertEqual(case.procedure,'Radikale Zystektomie mit Ileum-Conduit')
+        self.assertEqual(case.op_date.isoformat(),'2026-08-14')
+        stale=self.client.patch(url,data=json.dumps({'name':'Stale','baseUpdatedAt':before['updatedAt']}),content_type='application/json')
+        self.assertEqual(stale.status_code,409)
+        self.assertEqual(Patient.objects.get().name,'Muster Anna')
+
+    def test_date_correction_updates_existing_state_and_bowel_guidance(self):
+        self.create_case()
+        case=TreatmentCase.objects.get()
+        url=reverse('patients_api:case-detail',kwargs={'case_number':case.case_number})
+        before=self.client.get(url).json()['case']
+        response=self.client.patch(url,data=json.dumps({'opDate':'2026-11-10','baseUpdatedAt':before['updatedAt']}),content_type='application/json')
+        self.assertEqual(response.status_code,200)
+        state=self.client.get(reverse('responses_api:case-state',kwargs={'case_number':case.case_number})).json()
+        self.assertEqual(state['state']['opDate'],'2026-11-10')
+        self.assertEqual(state['derived']['bowel']['startDate'],'2026-11-07')
+
+    def test_legacy_unknown_sex_is_not_inferred_when_other_data_is_edited(self):
+        patient=Patient.objects.create(name='Legacy')
+        case=TreatmentCase.objects.create(patient=patient,case_number='LEGACY')
+        url=reverse('patients_api:case-detail',kwargs={'case_number':case.case_number})
+        before=self.client.get(url).json()['case']
+        response=self.client.patch(url,data=json.dumps({'surgeon':'Corrected','baseUpdatedAt':before['updatedAt']}),content_type='application/json')
+        self.assertEqual(response.status_code,200)
+        patient.refresh_from_db()
+        self.assertEqual(patient.sex,'')
+
+    def test_delete_requires_explicit_patient_and_valid_confirmation_token(self):
+        self.create_case()
+        url=reverse('patients_api:case-detail',kwargs={'case_number':'F-78342'})
+        case=self.client.get(url).json()['case']
+        for payload in ({}, {'confirmedPatientId':case['patientId']},
+                        {'confirmedPatientId':'other','deletionToken':case['deletionToken']},
+                        {'confirmedPatientId':case['patientId'],'deletionToken':'invalid'},
+                        {'confirmedPatientId':case['patientId'],'deletionToken':{}}):
+            response=self.client.delete(url,data=json.dumps(payload),content_type='application/json')
+            self.assertEqual(response.status_code,422)
+            self.assertTrue(Patient.objects.filter(pk=case['patientId']).exists())
+
+    def test_confirmed_deletion_removes_all_patient_cases_and_checklists_only(self):
+        from apps.responses.models import ChecklistState
+        from apps.audit.models import AuditEvent
+        self.create_case()
+        self.create_case(caseNumber='SECOND')
+        self.create_case(caseNumber='OTHER',name='Other QA',patientNumber='P-OTHER')
+        url=reverse('patients_api:case-detail',kwargs={'case_number':'F-78342'})
+        case=self.client.get(url).json()['case']
+        self.assertEqual(case['patientCaseCount'],2)
+        audit_count=AuditEvent.objects.count()
+        response=self.client.delete(url,data=json.dumps({'confirmedPatientId':case['patientId'],'deletionToken':case['deletionToken']}),content_type='application/json')
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.json(),{'deleted':True,'caseCount':2})
+        self.assertFalse(Patient.objects.filter(pk=case['patientId']).exists())
+        self.assertEqual(list(TreatmentCase.objects.values_list('case_number',flat=True)),['OTHER'])
+        self.assertEqual(ChecklistState.objects.count(),1)
+        self.assertEqual(AuditEvent.objects.count(),audit_count+1)
+        self.assertTrue(AuditEvent.objects.filter(event_type='patient_deleted',entity_id=case['patientId']).exists())
+        self.assertEqual(self.client.delete(url,data=json.dumps({}),content_type='application/json').status_code,404)
+
+    def test_deletion_rejects_confirmation_after_other_case_was_added(self):
+        self.create_case()
+        url=reverse('patients_api:case-detail',kwargs={'case_number':'F-78342'})
+        case=self.client.get(url).json()['case']
+        self.create_case(caseNumber='ADDED')
+        response=self.client.delete(url,data=json.dumps({'confirmedPatientId':case['patientId'],'deletionToken':case['deletionToken']}),content_type='application/json')
+        self.assertEqual(response.status_code,409)
+        self.assertEqual(TreatmentCase.objects.count(),2)
+
+    def test_deletion_rejects_confirmation_after_checklist_was_changed(self):
+        from apps.responses.models import ChecklistState
+        self.create_case()
+        url=reverse('patients_api:case-detail',kwargs={'case_number':'F-78342'})
+        case=self.client.get(url).json()['case']
+        state=ChecklistState.objects.get()
+        state.revision+=1
+        state.save(update_fields=['revision'])
+        response=self.client.delete(url,data=json.dumps({'confirmedPatientId':case['patientId'],'deletionToken':case['deletionToken']}),content_type='application/json')
+        self.assertEqual(response.status_code,409)
+        self.assertEqual(Patient.objects.count(),1)

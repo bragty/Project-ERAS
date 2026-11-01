@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "fields": {
     "amb_ileum_uk_entfernung": {
       "label": "Entfernung UK (Datum)",
@@ -361,7 +361,8 @@
       "label": "EF (%)",
       "type": "number",
       "min": 0,
-      "max": 100
+      "max": 100,
+      "step": "any"
     },
     "onko_behandler": {
       "label": "Zuständige/r Onkologe/in",
@@ -477,7 +478,8 @@
     "raucher_menge": {
       "label": "Zigaretten/Tag",
       "type": "number",
-      "min": 0
+      "min": 0,
+      "step": "any"
     },
     "raucher_py": {
       "label": "Pack Years",
@@ -576,7 +578,8 @@
       "label": "NRS-Score (0–7)",
       "type": "number",
       "min": 0,
-      "max": 7
+      "max": 7,
+      "step": "1"
     },
     "score_stopbang": {
       "label": "Gesamtpunktzahl (automatisch, 0–8)",
@@ -661,7 +664,7 @@
       ]
     },
     "stopbang_sex": {
-      "label": "Männlich?",
+      "label": "Männlich? (aus Patientenstammdaten)",
       "type": "select",
       "options": [
         {
@@ -672,7 +675,8 @@
           "value": "0",
           "label": "0 – Nein"
         }
-      ]
+      ],
+      "readonly": true
     },
     "stopbang_snoring": {
       "label": "Schnarchen Sie laut (lauter als Sprechen oder hörbar durch eine geschlossene Tür)?",
@@ -718,15 +722,21 @@
     },
     "tropo_preop": {
       "label": "Troponin präOP (ng/L)",
-      "type": "number"
+      "type": "number",
+      "step": "any",
+      "min": 0
     },
     "tropo_tag1": {
       "label": "Troponin Tag 1 (ng/L)",
-      "type": "number"
+      "type": "number",
+      "step": "any",
+      "min": 0
     },
     "tropo_tag2": {
       "label": "Troponin Tag 2 (ng/L)",
-      "type": "number"
+      "type": "number",
+      "step": "any",
+      "min": 0
     },
     "urinkultur_datum": {
       "label": "Geplantes Datum",
@@ -755,28 +765,272 @@
     "vital_puls": {
       "label": "Puls (/min)",
       "type": "number",
-      "min": 0
+      "min": 0,
+      "step": "any"
     },
     "vital_rr_dia": {
       "label": "RR diastolisch (mmHg)",
       "type": "number",
-      "min": 0
+      "min": 0,
+      "step": "any"
     },
     "vital_rr_sys": {
       "label": "RR systolisch (mmHg)",
       "type": "number",
-      "min": 0
+      "min": 0,
+      "step": "any"
     },
     "vital_spo2": {
       "label": "SpO2 (%)",
       "type": "number",
       "min": 0,
-      "max": 100
+      "max": 100,
+      "step": "any"
     },
     "vital_temp": {
       "label": "Temperatur (C)",
       "type": "number",
+      "step": "0.1",
+      "min": 0
+    },
+    "untersuchung_prostata": {
+      "label": "Prostatavolumen (ml)",
+      "type": "number",
+      "optional": true,
+      "min": 0,
+      "step": "0.1",
+      "maleOnly": true
+    },
+    "untersuchung_abdomen": {
+      "label": "Abdomen / Voroperationen, Narben und Hernien",
+      "type": "textarea",
+      "optional": true
+    },
+    "untersuchung_haut": {
+      "label": "Wunden / Hautverhältnisse",
+      "type": "textarea",
+      "optional": true
+    },
+    "untersuchung_hals": {
+      "label": "Halsumfang (cm)",
+      "type": "number",
+      "optional": true,
+      "min": 0,
       "step": "0.1"
+    },
+    "untersuchung_bauch": {
+      "label": "Bauchumfang (cm)",
+      "type": "number",
+      "optional": true,
+      "min": 0,
+      "step": "0.1"
+    },
+    "untersuchung_sturz": {
+      "label": "Sturzgefahr – Beurteilung / verwendete Klassifikation",
+      "type": "textarea",
+      "optional": true
+    },
+    "anamnese_urologe": {
+      "label": "Externer Urologe",
+      "type": "text",
+      "optional": true
+    },
+    "anamnese_hausarzt": {
+      "label": "Hausarzt",
+      "type": "text",
+      "optional": true
+    },
+    "anamnese_aerzte": {
+      "label": "Weitere behandelnde Ärzte",
+      "type": "physicians",
+      "optional": true
+    },
+    "anamnese_sozial": {
+      "label": "Beruf / Familie / Wohnsituation",
+      "type": "textarea",
+      "optional": true
+    },
+    "anamnese_miktion": {
+      "label": "Miktion / Kontinenz",
+      "type": "textarea",
+      "optional": true
+    },
+    "anamnese_stuhl": {
+      "label": "Stuhlgang",
+      "type": "textarea",
+      "optional": true
+    },
+    "anamnese_gewichtsverlust": {
+      "label": "Gewichtsverlust – Verlauf / Zeitraum",
+      "type": "textarea",
+      "optional": true
+    },
+    "anamnese_erektion": {
+      "label": "Erektion",
+      "type": "text",
+      "optional": true,
+      "maleOnly": true
+    },
+    "anamnese_shim": {
+      "label": "SHIM-Score (extern erhoben)",
+      "type": "number",
+      "optional": true,
+      "min": 0,
+      "max": 25,
+      "step": 1,
+      "maleOnly": true
+    },
+    "anamnese_allergien": {
+      "label": "Allergien / CAVE – manuell abgeglichen",
+      "type": "textarea",
+      "optional": true
+    },
+    "anamnese_blutung": {
+      "label": "Blutungsrisiko",
+      "type": "select",
+      "optional": true,
+      "options": [
+        "Ja",
+        "Nein",
+        "Unbekannt"
+      ]
+    },
+    "anamnese_blutung_notiz": {
+      "label": "Bemerkung zum Blutungsrisiko",
+      "type": "text",
+      "optional": true
+    },
+    "anamnese_thrombose": {
+      "label": "Thromboserisiko",
+      "type": "select",
+      "optional": true,
+      "options": [
+        "Ja",
+        "Nein",
+        "Unbekannt"
+      ]
+    },
+    "anamnese_thrombose_notiz": {
+      "label": "Bemerkung zum Thromboserisiko",
+      "type": "text",
+      "optional": true
+    },
+    "anamnese_rea_ips": {
+      "label": "REA / IPS Status – gemäss klinischer Dokumentation",
+      "type": "textarea",
+      "optional": true
+    },
+    "anamnese_grippe": {
+      "label": "Grippeimpfung",
+      "type": "select",
+      "optional": true,
+      "options": [
+        "Geimpft",
+        "Nicht geimpft",
+        "Unbekannt"
+      ]
+    },
+    "anamnese_covid": {
+      "label": "Covid-Impfung",
+      "type": "select",
+      "optional": true,
+      "options": [
+        "Geimpft",
+        "Nicht geimpft",
+        "Unbekannt"
+      ]
+    },
+    "anamnese_cyclokapron": {
+      "label": "Kontraindikation Cyclokapron",
+      "type": "select",
+      "optional": true,
+      "options": [
+        "Ja",
+        "Nein",
+        "Unbekannt"
+      ]
+    },
+    "kardio_akut": {
+      "label": "Sind akut symptomatische Herzerkrankungen vorhanden?",
+      "type": "select",
+      "options": [
+        "Ja",
+        "Nein",
+        "Unbekannt"
+      ]
+    },
+    "kardio_kategorien": {
+      "label": "Akute Herzerkrankungen",
+      "type": "multiselect",
+      "optional": true,
+      "options": [
+        "Instabiles Koronarsyndrom",
+        "Dekompensierte Herzinsuffizienz",
+        "Signifikante Arrhythmien",
+        "Relevante Klappenerkrankungen"
+      ]
+    },
+    "kardio_bemerkung": {
+      "label": "Kardiologische Bemerkungen",
+      "type": "textarea",
+      "optional": true
+    },
+    "kardio_met": {
+      "label": "Funktionelle Leistungsfähigkeit (MET)",
+      "type": "select",
+      "options": [
+        {
+          "value": "gt4",
+          "label": "MET > 4 – gut belastbar"
+        },
+        {
+          "value": "around4",
+          "label": "MET um 4 – beispielsweise zwei Stockwerke Treppensteigen"
+        },
+        {
+          "value": "lt4",
+          "label": "MET < 4 – eingeschränkt belastbar"
+        },
+        {
+          "value": "unknown",
+          "label": "Nicht beurteilbar"
+        }
+      ]
+    },
+    "kardio_risiken": {
+      "label": "Kardiale Risikofaktoren (bereitgestellte Tabelle)",
+      "type": "multiselect",
+      "optional": true,
+      "options": [
+        "Herzinsuffizienz",
+        "Koronare Herzkrankheit (KHK)",
+        "Zerebrovaskuläre Insuffizienz",
+        "Niereninsuffizienz (Kreatinin > 176 µmol/l)",
+        "Insulinpflichtiger Diabetes mellitus"
+      ]
+    },
+    "kardio_risiken_beurteilt": {
+      "label": "Risikofaktoren vollständig überprüft?",
+      "type": "select",
+      "options": [
+        "Ja",
+        "Nein",
+        "Unbekannt"
+      ]
+    },
+    "stuhl_obstipation": {
+      "label": "Vorbekannte Obstipation",
+      "type": "select",
+      "options": [
+        "Ja",
+        "Nein",
+        "Unbekannt"
+      ]
+    },
+    "stuhl_rezept": {
+      "label": "Rezept abgegeben und erläutert",
+      "type": "checkbox",
+      "optional": true
     }
   },
   "preop": [
@@ -792,6 +1046,68 @@
         "vital_temp",
         "vital_gewicht",
         "vital_groesse"
+      ]
+    },
+    {
+      "id": "t1:untersuchung",
+      "title": "Körperliche Untersuchung",
+      "fields": [
+        "untersuchung_prostata",
+        "untersuchung_abdomen",
+        "untersuchung_haut",
+        "untersuchung_hals",
+        "untersuchung_bauch",
+        "untersuchung_sturz"
+      ],
+      "detail": [
+        "Optionale Befunde. Geschlechtsspezifische Felder folgen den zentralen Patientenstammdaten; daraus wird keine Aussage über vorhandene Organe abgeleitet."
+      ]
+    },
+    {
+      "id": "t1:divider:anamnese",
+      "divider": "Anamnese"
+    },
+    {
+      "id": "t1:anamnese-aerzte",
+      "title": "Behandelnde Ärzte",
+      "fields": [
+        "anamnese_urologe",
+        "anamnese_hausarzt",
+        "anamnese_aerzte"
+      ]
+    },
+    {
+      "id": "t1:anamnese-alltag",
+      "title": "Sozialanamnese und Ausscheidung",
+      "fields": [
+        "anamnese_sozial",
+        "anamnese_miktion",
+        "anamnese_stuhl",
+        "anamnese_gewichtsverlust",
+        "anamnese_erektion",
+        "anamnese_shim"
+      ],
+      "detail": [
+        "Raucher- und Suchtmittelanamnese werden in den vorhandenen Abschnitten erfasst. Der Gewichtsverlust im G8 bleibt Teil des bestehenden Fragebogens; hier nur ergänzende Verlaufsangaben."
+      ]
+    },
+    {
+      "id": "t1:anamnese-risiken",
+      "title": "Allergien, Risiken und klinischer Status",
+      "fields": [
+        "anamnese_allergien",
+        "anamnese_blutung",
+        "anamnese_blutung_notiz",
+        "anamnese_thrombose",
+        "anamnese_thrombose_notiz",
+        "anamnese_rea_ips",
+        "anamnese_grippe",
+        "anamnese_covid",
+        "anamnese_cyclokapron"
+      ],
+      "detail": [
+        "Keine technische CAVE-Anbindung vorhanden. Allergien manuell aus der klinischen Dokumentation abgleichen; fehlende Angaben bedeuten nicht «keine Allergien».",
+        "Für REA / IPS ist keine bestehende strukturierte Auswahl hinterlegt; Wortlaut der klinischen Dokumentation übernehmen."
       ]
     },
     {
@@ -975,17 +1291,32 @@
       "id": "t1:kardio",
       "title": "Überprüfung Zuweisung Kardiologie gemäss Weisung „Präoperative kardiale Abklärung“",
       "detail": [
-        "Zuweisung sobald Kriterien erfüllt, oder vorbekannt EF <50% oder mMRC Grad 3/4"
+        "Zuweisung sobald Kriterien erfüllt, oder vorbekannt EF <50% oder mMRC Grad 3/4",
+        "MET beschreibt die funktionelle Belastbarkeit. >4: gut belastbar; <4: eingeschränkt; um 4: Grenzbereich, fachlich abzuklären. Nicht beurteilbar ergibt keine Entwarnung.",
+        "Die Anzahl bezieht sich auf die fünf bereitgestellten Risikofaktoren, nicht auf einen vollständigen RCRI. Klinische Entscheidungshilfe; keine automatische Konsilanordnung. Bestehende EF-/mMRC-Regeln bleiben wirksam."
       ],
       "fields": [
         "kardio_ef",
         {
           "key": "score_mmrc",
           "label": "mMRC aus Fragebögen",
-          "options": ["0", "1", "2", "3", "4"]
-        }
+          "options": [
+            "0",
+            "1",
+            "2",
+            "3",
+            "4"
+          ]
+        },
+        "kardio_akut",
+        "kardio_kategorien",
+        "kardio_bemerkung",
+        "kardio_met",
+        "kardio_risiken",
+        "kardio_risiken_beurteilt"
       ],
-      "flagRule": "kardio"
+      "flagRule": "kardio",
+      "custom": "cardiac"
     },
     {
       "id": "t1:raucher",
@@ -1116,6 +1447,18 @@
       "title": "Planung Urinkultur",
       "fields": [
         "urinkultur_datum"
+      ]
+    },
+    {
+      "id": "t1:stuhlregulation",
+      "title": "Stuhlregulation",
+      "fields": [
+        "stuhl_obstipation",
+        "stuhl_rezept"
+      ],
+      "custom": "bowel",
+      "detail": [
+        "Klinisch zu prüfende Vorgabe; keine automatisch ausgestellte Verordnung. Rezept während der BENE-Sprechstunde abgeben und erläutern."
       ]
     }
   ],

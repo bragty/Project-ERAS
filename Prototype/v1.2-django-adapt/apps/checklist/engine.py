@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
 from .lab_import.mapping import CATALOG_BY_LABEL
 from .lab_import.parser import normalize_numeric
-from .rules import FLAG_RULES, active_flags, as_number, field_required, referrals
+from .rules import FLAG_RULES, active_flags, as_number, field_required, referrals, cardiac_assessment, bowel_guidance
 from .schema import (
     ALL_ITEM_IDS,
     CURRENT_SCHEMA_VERSION,
@@ -38,9 +38,18 @@ def _questionnaire_score(config, answers):
     return str(int(score)) if float(score).is_integer() else str(score)
 
 
-def _recompute_questionnaires(answers):
+def _recompute_questionnaires(answers, effective_answers=None):
     for config in QUESTIONNAIRES.values():
-        answers[config["score_key"]] = _questionnaire_score(config, answers) or ""
+        answers[config["score_key"]] = _questionnaire_score(config, effective_answers if effective_answers is not None else answers) or ""
+
+
+def patient_answers(answers, treatment_case):
+    """One authoritative context for visibility, validation and STOP-BANG.
+
+    The legacy questionnaire answer stays stored for reference; it is never
+    inferred into central patient data or used instead of a missing sex value.
+    """
+    return {**answers, "stopbang_sex": {"male": "1", "female": "0"}.get(treatment_case.patient.sex, "")}
 
 
 def migrate_state(state):
@@ -93,14 +102,44 @@ def _off_step(number, rule):
         return False
 
 
-def _validate_field(key, value, answers):
+def _validate_field(key, value, answers, *, validate_hidden=False):
     rule = FIELD_RULES.get(key)
     if not rule:
         return None
+    # Hidden optional values remain stored when context changes.
+    if rule.get("maleOnly") and answers.get("stopbang_sex") != "1" and not validate_hidden:
+        return None
+    kind = rule.get("type")
+    if kind == "multiselect":
+        if value is None:
+            return None
+        if not isinstance(value, list) or any(not isinstance(v, str) or v not in _option_values(rule) for v in value):
+            return "Ungültige Mehrfachauswahl."
+        if len(set(value)) != len(value):
+            return "Auswahl enthält doppelte Einträge."
+        return None
+    if kind == "physicians":
+        if value is None:
+            return None
+        if not isinstance(value, list) or len(value) > 50:
+            return "Höchstens 50 behandelnde Ärzte erfassen."
+        for row in value:
+            if not isinstance(row, dict) or set(row) - {"specialty", "name"}:
+                return "Ungültiger Arzteintrag."
+            if any(not isinstance(v, str) or len(v) > 2000 for v in row.values()):
+                return "Fachrichtung und Name müssen Texte mit höchstens 2000 Zeichen sein."
+            if any(v.strip() for v in row.values()) and not all(str(row.get(k, "")).strip() for k in ("specialty", "name")):
+                return "Bei jedem Arzteintrag Fachrichtung und Name ergänzen."
+        return None
+    if kind == "checkbox":
+        return None if value in (None, "", "Ja", "Nein") else "Ungültiger Checkboxwert."
     if value is None or str(value).strip() == "":
         return "Pflichtfeld." if field_required(key, rule, answers) else None
 
-    kind = rule.get("type")
+    if isinstance(value, (dict, list, bool)):
+        return "Ungültiger Feldwert."
+    if kind in {"text", "textarea"} and (not isinstance(value, str) or len(value) > 2000):
+        return "Text mit höchstens 2000 Zeichen erwartet."
     if kind == "number":
         number = as_number(value)
         if number is None:
@@ -113,7 +152,8 @@ def _validate_field(key, value, answers):
             return f"Wert muss in Schritten von {rule['step']} angegeben werden."
     elif kind == "date":
         try:
-            date.fromisoformat(str(value))
+            if date.fromisoformat(str(value)).isoformat() != str(value):
+                raise ValueError
         except ValueError:
             return "Ungültiges Datum."
     elif kind == "select":
@@ -122,13 +162,73 @@ def _validate_field(key, value, answers):
     return None
 
 
-def validate_item(item_id, state):
-    answers = state.get("answers") or {}
+def parse_operation_date(raw):
+    if not raw:
+        return None
+    for fmt in ("%Y-%m-%d", "%d.%m.%Y"):
+        try:
+            parsed = datetime.strptime(str(raw).strip(), fmt).date()
+            if parsed.strftime(fmt) == str(raw).strip():
+                return parsed
+        except ValueError:
+            pass
+    return None
+
+
+def draft_errors(state, treatment_case, *, validate_hidden=False):
+    """Technical errors in populated fields. Blank/incomplete work remains a draft."""
+    answers = patient_answers(state.get("answers") or {}, treatment_case)
+    errors = {}
+    excluded = excluded_item_ids(treatment_case)
+    for item_id, keys in ITEM_FIELDS.items():
+        if item_id in excluded:
+            continue
+        for key in keys:
+            value = answers.get(key)
+            if FIELD_RULES[key].get("readonly") or value is None or (isinstance(value, str) and not value.strip()):
+                continue
+            error = _validate_field(key, value, answers, validate_hidden=validate_hidden)
+            if error:
+                errors.setdefault(item_id, {})[key] = error
+    if state.get("opDate") and not parse_operation_date(state["opDate"]):
+        errors["header"] = {"opDate": "Bitte ein gültiges OP-Datum als TT.MM.JJJJ oder JJJJ-MM-TT eingeben."}
+    for referral_id, entry in (state.get("referrals") or {}).items():
+        if not isinstance(entry, dict):
+            errors.setdefault("referrals", {})[referral_id] = "Ungültiger Arbeitslisteneintrag."
+            continue
+        value = entry.get("date")
+        if value:
+            try:
+                if date.fromisoformat(value).isoformat() != value:
+                    raise ValueError
+            except (TypeError, ValueError):
+                errors.setdefault("referrals", {})[referral_id] = "Bitte ein gültiges Datum eingeben."
+    for index, row in enumerate(state.get("labs") or []):
+        if not isinstance(row, dict):
+            errors.setdefault("t1:laborwerte", {})[f"lab:{index}"] = "Ungültige Laborzeile."
+            continue
+        label, value = row.get("type"), row.get("value")
+        if (label is not None and not isinstance(label, str)) or (label and label not in CATALOG_BY_LABEL):
+            errors.setdefault("t1:laborwerte", {})[f"lab:{index}:type"] = "Unbekannter Laborparameter."
+        if value not in (None, "") and label != "Anderer Wert":
+            _operator, numeric = normalize_numeric(value)
+            if numeric is None or as_number(numeric) is None or as_number(numeric) < 0:
+                errors.setdefault("t1:laborwerte", {})[f"lab:{index}:value"] = "Nichtnegativen Zahlenwert eingeben (optional mit < oder >)."
+    return errors
+
+
+def validate_item(item_id, state, effective_answers=None):
+    answers = effective_answers if effective_answers is not None else state.get("answers") or {}
     errors = {}
     for key in ITEM_FIELDS.get(item_id, []):
         error = _validate_field(key, answers.get(key), answers)
         if error:
             errors[key] = error
+
+    if item_id == "t1:kardio":
+        assessment = cardiac_assessment(answers)
+        if assessment["pending"]:
+            errors["kardio_met"] = " ".join(assessment["pending"])
 
     if item_id == "t1:laborwerte":
         labs = state.get("labs") or []
@@ -205,7 +305,10 @@ def evaluate_state(raw_state, treatment_case):
     }
 
     answers = base["answers"]
-    _recompute_questionnaires(answers)
+    if not treatment_case.patient.sex and answers.get("score_stopbang") not in (None, ""):
+        base["legacyScores"].setdefault("score_stopbang", answers["score_stopbang"])
+    _recompute_questionnaires(answers, patient_answers(answers, treatment_case))
+    effective_answers = patient_answers(answers, treatment_case)
 
     # Items excluded for the case's Eingriffsart neither count nor block
     # completion. Their ticks are kept unvalidated, so they reappear unchanged
@@ -220,11 +323,11 @@ def evaluate_state(raw_state, treatment_case):
         for item_id, value in base["checked"].items()
         if item_id in ALL_ITEM_IDS and bool(value)
     }
-    validation_errors = {}
+    validation_errors = draft_errors(base, treatment_case)
     for item_id in list(checked):
         if item_id in excluded:
             continue
-        errors = validate_item(item_id, base)
+        errors = validate_item(item_id, base, effective_answers)
         if errors:
             checked.pop(item_id, None)
             validation_errors[item_id] = errors
@@ -253,6 +356,9 @@ def evaluate_state(raw_state, treatment_case):
     }
     # Everything the frontend displays but must not compute itself.
     derived = {
+        "patientSex": treatment_case.patient.sex,
+        "cardiac": cardiac_assessment(answers),
+        "bowel": bowel_guidance(answers, base["opDate"]),
         "bmi": bmi,
         "flags": flags,
         "flagMessages": {name: FLAG_RULES[name].message for name, active in flags.items() if active},

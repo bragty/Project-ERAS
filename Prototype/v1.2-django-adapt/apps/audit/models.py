@@ -26,7 +26,7 @@ class AuditEvent(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
-        indexes = [models.Index(fields=["event_type", "created_at"])]
+        indexes = [models.Index(fields=["event_type", "created_at"], name="audit_audit_event_t_f6d064_idx")]
 
     def __str__(self):
         return f"{self.event_type} @ {self.created_at:%Y-%m-%d %H:%M:%S}"

@@ -5,11 +5,18 @@
         <button type="button" class="modal-close" id="closePatientModal" aria-label="Fenster schliessen">×</button>
       </div>
       <div class="modal-body">
+        <form id="patientForm" novalidate>
+        <p id="patientFormMessage" class="form-message" role="alert" hidden></p>
+        <p id="patientEditHint" hidden>Name, Patientennummer und Geschlecht gelten für alle Fälle dieses Patienten.</p>
         <div class="modal-grid">
           <label class="field"><span>BENE-Nurse</span><input id="newBeneNurse" type="text"></label>
           <label class="field"><span>BENE-Nurse Stellvertretung</span><input id="newBeneDeputy" type="text"></label>
           <label class="field"><span>Operateur</span><input id="newSurgeon" type="text"></label>
           <label class="field"><span>Patient*in Name</span><input id="newPatientName" type="text"></label>
+          <label class="field"><span>Geschlecht *</span><select id="newPatientSex">
+            <option value="">Bitte wählen</option>
+            {% for option in patient_form_rules.sexOptions %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}
+          </select></label>
           <label class="field"><span>Patient*in Nummer</span><input id="newPatientNumber" type="text"></label>
           <label class="field"><span>Patient*in Fallnummer</span><input id="newCaseNumber" type="text"></label>
           <label class="field"><span>OP Datum falls vorhanden</span><input id="newOpDate" type="date"></label>
@@ -21,9 +28,29 @@
           </label>
         </div>
         <div class="modal-actions">
+          <button type="button" class="btn danger" id="deletePatient" hidden>Patient löschen</button>
           <button type="button" class="btn" id="cancelPatientModal">Abbrechen</button>
-          <button type="button" class="btn primary" id="savePatient">Patient übernehmen</button>
+          <button type="submit" class="btn primary" id="savePatient">Patient übernehmen</button>
+        </div>
+        </form>
+        <div id="patientDiscardConfirmation" role="alertdialog" aria-modal="true" aria-labelledby="patientDiscardTitle" hidden>
+          <p id="patientDiscardTitle">Du hast ungespeicherte Änderungen. Möchtest du die Patientenerfassung wirklich schliessen?</p>
+          <div class="modal-actions">
+            <button type="button" class="btn primary" id="continuePatientEditing">Weiterbearbeiten</button>
+            <button type="button" class="btn" id="discardPatientChanges">Ohne Speichern schliessen</button>
+          </div>
+        </div>
+        <div id="patientDeleteConfirmation" role="alertdialog" aria-modal="true" aria-labelledby="patientDeleteTitle" hidden>
+          <h3 id="patientDeleteTitle">Patient wirklich löschen?</h3>
+          <p id="patientDeleteDescription"></p>
+          <p>Alle zugehörigen Behandlungsfälle und Checklisten werden endgültig gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.</p>
+          <p id="patientDeleteError" class="form-message" role="alert" hidden></p>
+          <div class="modal-actions">
+            <button type="button" class="btn" id="cancelPatientDelete">Abbrechen</button>
+            <button type="button" class="btn danger" id="confirmPatientDelete">Patient endgültig löschen</button>
+          </div>
         </div>
       </div>
     </div>
   </div>
+{{ patient_form_rules|json_script:"patient-form-rules" }}

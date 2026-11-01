@@ -4,6 +4,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from apps.checklist.models import ProcedureType
 from apps.checklist.services import effective_definition
 from apps.patients.models import TreatmentCase
+from apps.patients.services import patient_form_rules
 
 
 @ensure_csrf_cookie
@@ -14,6 +15,7 @@ def home(request):
         {
             "page_title": "BENE Plattform - Frontpage V1.1",
             "procedure_types": ProcedureType.objects.filter(active=True),
+            "patient_form_rules": patient_form_rules(),
         },
     )
 

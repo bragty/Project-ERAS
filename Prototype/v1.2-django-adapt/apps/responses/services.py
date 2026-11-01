@@ -1,28 +1,16 @@
 from copy import deepcopy
-from datetime import date, datetime
 
 from django.db import transaction
 
 from apps.audit.services import record_event
 from apps.core.api import ApiError
-from apps.checklist.engine import default_state, evaluate_state, migrate_state
+from apps.checklist.engine import default_state, evaluate_state, migrate_state, draft_errors, parse_operation_date
 
 from .models import ChecklistState
 
 
 def _parse_state_op_date(raw):
-    if not raw:
-        return None
-    raw = str(raw).strip()
-    for parser in (
-        lambda value: date.fromisoformat(value),
-        lambda value: datetime.strptime(value, "%d.%m.%Y").date(),
-    ):
-        try:
-            return parser(raw)
-        except ValueError:
-            pass
-    return None
+    return parse_operation_date(raw)
 
 
 def create_initial_checklist_state(treatment_case):
@@ -70,6 +58,12 @@ def save_state(treatment_case, raw_state, base_revision=None):
     different fields do not overwrite each other.
     """
     from apps.checklist.lab_import.validation import validate_imported_labs
+    for key in ("answers", "checked", "notes", "referrals", "openBlocks"):
+        if key in raw_state and not isinstance(raw_state[key], dict):
+            raise ApiError("Ungültige Formularstruktur.", status=422, code="validation_error", fields={key: "JSON-Objekt erwartet."})
+    for key in ("labs", "suchtmittel"):
+        if key in raw_state and not isinstance(raw_state[key], list):
+            raise ApiError("Ungültige Listenstruktur.", status=422, code="validation_error", fields={key: "Liste erwartet."})
     validate_imported_labs(raw_state.get("labs") or [])
     state_obj, _ = ChecklistState.objects.select_for_update().get_or_create(
         treatment_case=treatment_case,
@@ -83,6 +77,23 @@ def save_state(treatment_case, raw_state, base_revision=None):
             fields={"revision": state_obj.revision},
         )
     old_state = deepcopy(state_obj.state or {})
+    technical_errors = draft_errors(raw_state, treatment_case, validate_hidden=True)
+    changed_errors = {}
+    for item_id, errors in technical_errors.items():
+        for key, message in errors.items():
+            if item_id == "header":
+                changed = raw_state.get("opDate") != old_state.get("opDate")
+            elif item_id == "referrals":
+                changed = (raw_state.get("referrals") or {}).get(key) != (old_state.get("referrals") or {}).get(key)
+            elif key.startswith("lab:"):
+                changed = raw_state.get("labs") != old_state.get("labs")
+            else:
+                changed = (raw_state.get("answers") or {}).get(key) != (old_state.get("answers") or {}).get(key)
+            if changed:
+                changed_errors.setdefault(item_id, {})[key] = message
+    if changed_errors:
+        raise ApiError("Bitte die markierten Angaben korrigieren. Die Eingaben bleiben im Formular erhalten.",
+                       status=422, code="validation_error", fields=changed_errors)
     normalized, summary, derived, errors = evaluate_state(raw_state, treatment_case)
 
     state_obj.state = normalized
@@ -94,6 +105,21 @@ def save_state(treatment_case, raw_state, base_revision=None):
     state_obj.validation_errors = errors
     state_obj.revision += 1
     state_obj.save()
+
+    old_answers = old_state.get("answers") or {}
+    new_answers = normalized.get("answers") or {}
+    changed_fields = sorted(
+        key for key in set(old_answers) | set(new_answers)
+        if old_answers.get(key) != new_answers.get(key)
+    )
+    if changed_fields:
+        record_event(
+            event_type="checklist_answers_changed",
+            treatment_case=treatment_case,
+            entity_type="ChecklistState",
+            entity_id=state_obj.id,
+            metadata={"fields": changed_fields, "revision": state_obj.revision},
+        )
 
     raw_op_date = str(normalized.get("opDate") or "").strip()
     parsed_date = _parse_state_op_date(raw_op_date)

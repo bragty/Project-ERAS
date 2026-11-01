@@ -1,7 +1,7 @@
 {% extends "eras/base.html" %}
 {% load static %}
 
-{% block extra_css %}<link rel="stylesheet" href="{% static 'eras/css/frontpage.css' %}">{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'eras/css/frontpage.css' %}?v=20261101-delete-patient">{% endblock %}
 
 {% block header %}{% include "eras/includes/frontpage_header.html" %}{% endblock %}
 
@@ -39,4 +39,4 @@
 {% include "eras/includes/patient_modal.html" %}
 {% endblock %}
 
-{% block extra_js %}<script src="{% static 'eras/js/frontpage.js' %}" defer></script>{% endblock %}
+{% block extra_js %}<script src="{% static 'eras/js/frontpage.js' %}?v=20261101-delete-patient" defer></script>{% endblock %}

@@ -10,7 +10,7 @@ const QUESTIONNAIRES = Object.fromEntries(CHECKLIST1.filter(it=>it.scoring).map(
 
 function questionnaireResultText(config,value,legacy){
   if(!config) return value!=null && value!=='' ? ` · Wert: ${value}` : ' · Noch offen';
-  const answered=config.questions.filter(q=>STATE.answers[q.key]!=null&&STATE.answers[q.key]!=='').length;
+  const answered=config.questions.filter(q=>{const answer=q.key==='stopbang_sex'?patientSexAnswer():STATE.answers[q.key];return answer!=null&&answer!=='';}).length;
   if(answered<config.questions.length) return ` · ${answered} / ${config.questions.length} beantwortet${legacy!=null ? ` · Bisheriger Gesamtwert: ${legacy}`:''}`;
   return value!=null && value!=='' ? ` · ${value} / ${config.max} Punkte` : ' · wird berechnet …';
 }

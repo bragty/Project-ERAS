@@ -101,7 +101,7 @@
   }
   .actions{
     display:grid;
-    grid-template-columns:minmax(260px, 1fr) auto;
+    grid-template-columns:minmax(0, 1fr) auto auto;
     gap:12px;
     align-items:end;
   }
@@ -152,6 +152,9 @@
     white-space:nowrap;
   }
   .btn.primary:hover{background:var(--blue-dark);}
+  .btn.danger { color:#a91d26; border-color:#a91d26; }
+  .btn.danger:hover { background:#fff1f0; }
+  .btn:disabled { opacity:.5; cursor:wait; }
   .patient-preview{
     margin-top:18px;
     border-top:1px solid var(--line);
@@ -245,7 +248,8 @@
   color: var(--ink-soft);
 }
 
-.progress-cell > .archive-icon {
+.progress-cell > .archive-icon,
+.progress-cell > .edit-patient-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -317,6 +321,14 @@
     grid-template-columns:repeat(2, minmax(0, 1fr));
     gap:12px 14px;
   }
+  .modal-grid > .field { display:grid; grid-template-rows:subgrid; grid-row:span 3; gap:4px; min-width:0; }
+  .modal-grid input,.modal-grid select { min-height:40px; }
+  .field-error { color:#a91d26; font-size:12px; min-height:1.2em; overflow-wrap:anywhere; }
+  [aria-invalid="true"] { border-color:#a91d26; }
+  .form-message { color:#a91d26; }
+  .patient-row > div { min-width:0; overflow-wrap:anywhere; }
+  .modal [hidden] { display:none; }
+  .modal-backdrop.open { overscroll-behavior:contain; }
   .modal-actions{
     display:flex;
     justify-content:flex-end;

@@ -73,7 +73,7 @@ class RuleTests(SimpleTestCase):
 
 class EngineRuleTests(TestCase):
     def setUp(self):
-        patient = Patient.objects.create(name="QA", patient_number="P-QA")
+        patient = Patient.objects.create(name="QA", patient_number="P-QA", sex="female")
         self.case = TreatmentCase.objects.create(patient=patient, case_number="F-QA")
         self.url = reverse("responses_api:case-state", kwargs={"case_number": self.case.case_number})
 
@@ -92,7 +92,9 @@ class EngineRuleTests(TestCase):
         self.assertEqual(self.put({"answers": stopbang})["state"]["answers"]["score_stopbang"], "0")
         epworth = {f"epworth_{index}": "3" for index in range(8)}
         self.assertEqual(self.put({"answers": epworth})["state"]["answers"]["score_epworth"], "24")
-        self.assertEqual(self.put({"answers": {**epworth, "epworth_0": "4"}})["state"]["answers"]["score_epworth"], "")
+        response = self.client.put(self.url, data=json.dumps({"state":{"answers":{**epworth,"epworth_0":"4"}}}), content_type="application/json")
+        self.assertEqual(response.status_code,422)
+        self.assertIn('epworth_0',response.json()['error']['fields']['t1:fb-epworth'])
 
     def test_derived_results_for_the_frontend(self):
         derived = self.put({
@@ -121,8 +123,9 @@ class EngineRuleTests(TestCase):
     def test_step_is_validated_like_the_browser_did(self):
         vitals = {"vital_rr_sys": "120", "vital_rr_dia": "80", "vital_puls": "70", "vital_spo2": "98",
                   "vital_gewicht": "70", "vital_groesse": "175"}
-        payload = self.put({"checked": {"t1:vitalparameter": True}, "answers": {**vitals, "vital_temp": "37.05"}})
-        self.assertIn("vital_temp", payload["validationErrors"]["t1:vitalparameter"])
+        response = self.client.put(self.url,data=json.dumps({"state":{"checked":{"t1:vitalparameter":True},"answers":{**vitals,"vital_temp":"37.05"}}}),content_type="application/json")
+        self.assertEqual(response.status_code,422)
+        self.assertIn("vital_temp", response.json()["error"]["fields"]["t1:vitalparameter"])
         payload = self.put({"checked": {"t1:vitalparameter": True}, "answers": {**vitals, "vital_temp": "37.1"}})
         self.assertTrue(payload["state"]["checked"]["t1:vitalparameter"])
 

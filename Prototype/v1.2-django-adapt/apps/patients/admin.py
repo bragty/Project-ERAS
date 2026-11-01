@@ -9,6 +9,7 @@ from apps.responses.services import create_initial_checklist_state, refresh_chec
 from apps.workflow.services import archive_case, restore_case
 
 from .models import Patient, TreatmentCase
+from .services import refresh_patient_cases
 
 
 class TreatmentCaseInline(admin.TabularInline):
@@ -25,10 +26,22 @@ class TreatmentCaseInline(admin.TabularInline):
 
 @admin.register(Patient)
 class PatientAdmin(admin.ModelAdmin):
-    list_display = ("name", "patient_number", "case_count", "created_at")
+    list_display = ("name", "patient_number", "sex", "case_count", "created_at")
     search_fields = ("name", "patient_number", "cases__case_number")
     readonly_fields = ("id", "created_at", "updated_at")
     inlines = [TreatmentCaseInline]
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        form.base_fields["sex"].required = obj is None or bool(obj.sex)
+        return form
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if change:
+            refresh_patient_cases(obj)
+        record_event(event_type="patient_updated_admin" if change else "patient_created_admin",
+                     entity_type="Patient", entity_id=obj.pk, metadata={"changedFields": sorted(form.changed_data)})
 
     def get_queryset(self, request):
         return super().get_queryset(request).annotate(_case_count=Count("cases"))

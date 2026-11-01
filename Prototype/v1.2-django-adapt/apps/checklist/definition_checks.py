@@ -13,8 +13,8 @@ from django.core import checks
 from .definition import base_definition, field_key, option_value
 from .rules import FLAG_RULES, REQUIRED_IF
 
-FIELD_TYPES = {"number", "date", "select", "text"}
-FIELD_KEYS = {"label", "type", "options", "min", "max", "step", "placeholder", "readonly", "optional"}
+FIELD_TYPES = {"number", "date", "select", "text", "textarea", "checkbox", "multiselect", "physicians"}
+FIELD_KEYS = {"label", "type", "options", "min", "max", "step", "placeholder", "readonly", "optional", "maleOnly"}
 ITEM_KEYS = {"id", "title", "detail", "fields", "flagRule", "custom", "questionnaire", "scoring", "widget", "scoreDescription"}
 FIELD_REF_KEYS = {"key", "label", "options"}
 WIDGETS = {"bmi"}
@@ -51,7 +51,7 @@ def _check_field(key, spec, errors):
     kind = spec.get("type")
     if kind not in FIELD_TYPES:
         errors.append(f"{where}: Typ {kind!r} ist unbekannt (erlaubt: {', '.join(sorted(FIELD_TYPES))}).")
-    if kind == "select":
+    if kind in {"select", "multiselect"}:
         _check_options(spec.get("options"), where, errors)
     elif "options" in spec:
         errors.append(f"{where}: 'options' ist nur bei Typ 'select' erlaubt.")
