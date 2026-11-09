@@ -119,6 +119,8 @@ def _validate_field(key, value, answers, *, validate_hidden=False):
             return "Auswahl enthält doppelte Einträge."
         return None
     if kind == "physicians":
+        if not value and not validate_hidden:
+            return "Pflichtfeld."
         if value is None:
             return None
         if not isinstance(value, list) or len(value) > 50:
@@ -130,6 +132,8 @@ def _validate_field(key, value, answers, *, validate_hidden=False):
                 return "Fachrichtung und Name müssen Texte mit höchstens 2000 Zeichen sein."
             if any(v.strip() for v in row.values()) and not all(str(row.get(k, "")).strip() for k in ("specialty", "name")):
                 return "Bei jedem Arzteintrag Fachrichtung und Name ergänzen."
+        if not validate_hidden and not any(row.get("name", "").strip() for row in value):
+            return "Pflichtfeld."
         return None
     if kind == "checkbox":
         return None if value in (None, "", "Ja", "Nein") else "Ungültiger Checkboxwert."
@@ -307,6 +311,18 @@ def evaluate_state(raw_state, treatment_case):
     answers = base["answers"]
     if not treatment_case.patient.sex and answers.get("score_stopbang") not in (None, ""):
         base["legacyScores"].setdefault("score_stopbang", answers["score_stopbang"])
+    height = as_number(answers.get("vital_groesse"))
+    weight = as_number(answers.get("vital_gewicht"))
+    bmi = None
+    if height and height > 0 and weight and weight > 0:
+        bmi = Decimal(str(weight)) * 10000 / Decimal(str(height)) ** 2
+    if "vital_gewicht" in answers or "vital_groesse" in answers:
+        answers["g8_bmi"] = str(sum(bmi >= limit for limit in (19, 21, 23))) if bmi is not None else ""
+        answers["stopbang_bmi"] = str(int(bmi > 35)) if bmi is not None else ""
+    if "raucher_jahre" in answers:
+        years = as_number(answers["raucher_jahre"])
+        daily = as_number(answers.get("raucher_menge"))
+        answers["raucher_py"] = str(round(daily / 20 * years, 1)) if years is not None and daily is not None else ""
     _recompute_questionnaires(answers, patient_answers(answers, treatment_case))
     effective_answers = patient_answers(answers, treatment_case)
 
@@ -339,9 +355,6 @@ def evaluate_state(raw_state, treatment_case):
     # A checklist without any applicable item is never complete (all([]) would be True).
     complete = bool(applicable_ids) and all(checked.get(item_id) for item_id in applicable_ids)
 
-    height = as_number(answers.get("vital_groesse"))
-    weight = as_number(answers.get("vital_gewicht"))
-    bmi = round(weight / ((height / 100) ** 2), 1) if height and height > 0 and weight and weight > 0 else None
     flags = active_flags(answers)
     op_date = base["opDate"] or "[OP-Datum ergänzen]"
     context = f"Patient/in: {base['patientName']}\nZystektomie geplant am {op_date}.\n"
@@ -359,7 +372,7 @@ def evaluate_state(raw_state, treatment_case):
         "patientSex": treatment_case.patient.sex,
         "cardiac": cardiac_assessment(answers),
         "bowel": bowel_guidance(answers, base["opDate"]),
-        "bmi": bmi,
+        "bmi": round(float(bmi), 1) if bmi is not None else None,
         "flags": flags,
         "flagMessages": {name: FLAG_RULES[name].message for name, active in flags.items() if active},
         "flaggedFields": sorted({key for name, active in flags.items() if active for key in FLAG_RULES[name].fields}),

@@ -489,6 +489,7 @@ input.invalid, select.invalid {border:2px solid #b42318; background:#fff1f0;}
 .clinical-guidance, .clinical-check { overflow-wrap: anywhere; }
 .fields fieldset { border: 1px solid var(--line, #d6dce2); border-radius: 8px; padding: 12px; }
 .clinical-check { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+.fields > .field.clinical-check { grid-column: 1 / -1; flex-direction: row; justify-content: flex-start; }
 .clinical-check input[type=checkbox] { width: auto; flex: 0 0 auto; }
 .fields textarea { width: 100%; box-sizing: border-box; font: inherit; resize: vertical; border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px; background: #FBFDFC; color: var(--ink); }
 .fields textarea:focus { outline: 2px solid var(--teal); border-color: var(--teal); }
@@ -511,3 +512,5 @@ input.invalid, select.invalid {border:2px solid #b42318; background:#fff1f0;}
 .referral > label { display:flex; flex-direction:column; gap:4px; min-width:0; }
 [aria-invalid="true"] { border-color:#a91d26; }
 @media(max-width:600px) { .fields,.patient-row { grid-template-columns:minmax(0,1fr); } }
+
+.never-smoker .note-toggle, .never-smoker .note-wrap { display: none; }

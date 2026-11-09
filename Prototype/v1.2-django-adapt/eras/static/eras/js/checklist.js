@@ -88,16 +88,29 @@ function physiciansHTML(key){
   </div>`).join('')}<button type="button" class="add-row-btn" data-add-doctor="${key}">+ Behandelnden Arzt hinzufügen</button></div>`;
 }
 
+function hasSmokingHistory(answers){
+  return !!answers.raucher_status && answers.raucher_status !== 'Nieraucher';
+}
+
+const conditionalFields = {
+  kardio_kategorien: a => a.kardio_akut === 'Ja',
+  raucher_menge: hasSmokingHistory,
+  raucher_jahre: hasSmokingHistory,
+  raucher_py: hasSmokingHistory,
+  raucher_sistiert_seit: a => a.raucher_status?.startsWith('Ex-')
+};
+
 function fieldsHTML(fields){
   return `<div class="fields">${fields.map(f=>{
     const val = STATE.answers[f.key];
     const error = Object.values(ITEM_ERRORS).map(e=>e[f.key]).find(Boolean);
     const message = `<small class="field-error" data-field-error="${f.key}" aria-live="polite">${esc(error||'')}</small>`;
-    const label = esc(f.label)+(f.optional ? ' (optional)' : '');
-    const wrapper = f.maleOnly ? ` data-male-field ${isMalePatient()?'':'hidden'}` : '';
+    const bmiOutput = ['g8_bmi', 'stopbang_bmi'].includes(f.key) ? ' <output data-questionnaire-bmi></output>' : '';
+    const label = esc(f.label)+bmiOutput+(f.optional ? ' (optional)' : '');
+    const wrapper = conditionalFields[f.key] ? ` data-conditional-field="${f.key}" ${conditionalFields[f.key](STATE.answers)?'':'hidden'}` : f.maleOnly ? ` data-male-field ${isMalePatient()?'':'hidden'}` : '';
     if (f.key === 'stopbang_sex') return `<label class="field"><span>${label}</span><output data-patient-sex>${esc(patientSexAnswer()===''?'Nicht erfasst – Stammdaten nachpflegen':isMalePatient()?'Ja':'Nein')}</output></label>`;
     if (f.type === 'physicians') return `<div class="field field-wide"><span>${label}</span>${physiciansHTML(f.key)}${message}</div>`;
-    if (f.type === 'multiselect') return `<fieldset class="field field-wide"><legend>${label}</legend>${f.options.map(o=>{
+    if (f.type === 'multiselect') return `<fieldset class="field field-wide"${wrapper}><legend>${label}</legend>${f.options.map(o=>{
       const value=typeof o==='object'?o.value:o, text=typeof o==='object'?o.label:o;
       return `<label class="clinical-check"><input type="checkbox" data-multi-key="${f.key}" value="${esc(value)}" ${Array.isArray(val)&&val.includes(value)?'checked':''}>${esc(text)}</label>`;
     }).join('')}${message}</fieldset>`;
@@ -338,10 +351,10 @@ function itemHTML(id, title, opts){
       ${customStr}
       ${flagHTML}
       ${errorsHTML}
-      <button type="button" class="note-toggle" data-notetoggle="${id}">${noteVal? '– Notiz ausblenden' : '+ Notiz'}</button>
+      ${["t1:fb-nrs","t1:fb-stopbang"].includes(id) ? "" : `<button type="button" class="note-toggle" data-notetoggle="${id}">${noteVal? '– Notiz ausblenden' : '+ Notiz'}</button>
       <div class="note-wrap ${noteOpen}" data-notewrap="${id}">
         <textarea data-notekey="${id}" rows="2" maxlength="${NOTE_MAX_LENGTH}" placeholder="Freitext-Notiz…">${esc(noteVal)}</textarea>
-      </div></div>
+      </div>`}</div>
       ${opts.questionnaire ? "</details>" : ""}
     </div>
   </div>`;
@@ -757,6 +770,12 @@ function renderProgress(ids, pctId, segId){
 
 // Shows the last server result; nothing here decides anything itself.
 function renderDerived(){
+  document.querySelectorAll('[data-conditional-field]').forEach(el=>{
+    el.hidden = !conditionalFields[el.dataset.conditionalField](STATE.answers);
+  });
+  document.querySelectorAll('[data-fkey="g8_bmi"], [data-fkey="stopbang_bmi"]').forEach(el=>{
+    el.disabled = 'vital_gewicht' in STATE.answers || 'vital_groesse' in STATE.answers;
+  });
   document.querySelectorAll('[data-male-field]').forEach(el=>{ el.hidden = !isMalePatient(); });
   document.querySelectorAll('[data-patient-sex]').forEach(el=>{el.textContent=patientSexAnswer()===''?'Nicht erfasst – Stammdaten nachpflegen':isMalePatient()?'Ja':'Nein';});
   const context=document.getElementById('patientContext');
@@ -770,6 +789,11 @@ function renderDerived(){
     const result = DERIVED.bowel;
     el.innerHTML = result ? `<strong>Klinisch zu prüfende Vorgabe</strong><p>${esc(result.message)}</p><p>${result.startDate ? 'Geplanter Beginn: '+esc(result.startDate) : 'OP-Datum zur Berechnung des Beginns ergänzen.'}</p>` : 'Obstipationsstatus und OP-Datum erfassen; fachliche Prüfung erforderlich.';
   });
+  document.querySelectorAll('[data-questionnaire-bmi]').forEach(el=>{
+    el.textContent = DERIVED.bmi == null ? '' : `(${DERIVED.bmi.toFixed(1)} kg/m²)`;
+  });
+  const smoking = document.querySelector('.item[data-id="t1:raucher"]');
+  if (smoking) smoking.classList.toggle('never-smoker', STATE.answers.raucher_status === 'Nieraucher');
   updateQuestionnaireResults();
   const bmi = document.getElementById('bmi');
   if (bmi) bmi.textContent = DERIVED.bmi != null ? DERIVED.bmi.toFixed(1) + ' kg/m²' : 'Grösse und Gewicht erfassen';

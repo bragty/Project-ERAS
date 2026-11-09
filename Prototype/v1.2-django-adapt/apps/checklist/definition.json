@@ -485,7 +485,8 @@
       "label": "Pack Years",
       "type": "number",
       "min": 0,
-      "step": "0.1"
+      "step": "0.1",
+      "readonly": true
     },
     "raucher_sistiert_seit": {
       "label": "Sistiert seit (MM/JJJJ)",
@@ -803,67 +804,55 @@
     },
     "untersuchung_abdomen": {
       "label": "Abdomen / Voroperationen, Narben und Hernien",
-      "type": "textarea",
-      "optional": true
+      "type": "textarea"
     },
     "untersuchung_haut": {
       "label": "Wunden / Hautverhältnisse",
-      "type": "textarea",
-      "optional": true
+      "type": "textarea"
     },
     "untersuchung_hals": {
       "label": "Halsumfang (cm)",
       "type": "number",
-      "optional": true,
       "min": 0,
       "step": "0.1"
     },
     "untersuchung_bauch": {
       "label": "Bauchumfang (cm)",
       "type": "number",
-      "optional": true,
       "min": 0,
       "step": "0.1"
     },
     "untersuchung_sturz": {
       "label": "Sturzgefahr – Beurteilung / verwendete Klassifikation",
-      "type": "textarea",
-      "optional": true
+      "type": "textarea"
     },
     "anamnese_urologe": {
       "label": "Externer Urologe",
-      "type": "text",
-      "optional": true
+      "type": "text"
     },
     "anamnese_hausarzt": {
       "label": "Hausarzt",
-      "type": "text",
-      "optional": true
+      "type": "text"
     },
     "anamnese_aerzte": {
       "label": "Weitere behandelnde Ärzte",
-      "type": "physicians",
-      "optional": true
+      "type": "physicians"
     },
     "anamnese_sozial": {
       "label": "Beruf / Familie / Wohnsituation",
-      "type": "textarea",
-      "optional": true
+      "type": "textarea"
     },
     "anamnese_miktion": {
       "label": "Miktion / Kontinenz",
-      "type": "textarea",
-      "optional": true
+      "type": "textarea"
     },
     "anamnese_stuhl": {
       "label": "Stuhlgang",
-      "type": "textarea",
-      "optional": true
+      "type": "textarea"
     },
     "anamnese_gewichtsverlust": {
       "label": "Gewichtsverlust – Verlauf / Zeitraum",
-      "type": "textarea",
-      "optional": true
+      "type": "textarea"
     },
     "anamnese_erektion": {
       "label": "Erektion",
@@ -874,7 +863,6 @@
     "anamnese_shim": {
       "label": "SHIM-Score (extern erhoben)",
       "type": "number",
-      "optional": true,
       "min": 0,
       "max": 25,
       "step": 1,
@@ -882,13 +870,11 @@
     },
     "anamnese_allergien": {
       "label": "Allergien / CAVE – manuell abgeglichen",
-      "type": "textarea",
-      "optional": true
+      "type": "textarea"
     },
     "anamnese_blutung": {
       "label": "Blutungsrisiko",
       "type": "select",
-      "optional": true,
       "options": [
         "Ja",
         "Nein",
@@ -897,13 +883,11 @@
     },
     "anamnese_blutung_notiz": {
       "label": "Bemerkung zum Blutungsrisiko",
-      "type": "text",
-      "optional": true
+      "type": "text"
     },
     "anamnese_thrombose": {
       "label": "Thromboserisiko",
       "type": "select",
-      "optional": true,
       "options": [
         "Ja",
         "Nein",
@@ -912,18 +896,15 @@
     },
     "anamnese_thrombose_notiz": {
       "label": "Bemerkung zum Thromboserisiko",
-      "type": "text",
-      "optional": true
+      "type": "text"
     },
     "anamnese_rea_ips": {
       "label": "REA / IPS Status – gemäss klinischer Dokumentation",
-      "type": "textarea",
-      "optional": true
+      "type": "textarea"
     },
     "anamnese_grippe": {
       "label": "Grippeimpfung",
       "type": "select",
-      "optional": true,
       "options": [
         "Geimpft",
         "Nicht geimpft",
@@ -933,7 +914,6 @@
     "anamnese_covid": {
       "label": "Covid-Impfung",
       "type": "select",
-      "optional": true,
       "options": [
         "Geimpft",
         "Nicht geimpft",
@@ -943,7 +923,6 @@
     "anamnese_cyclokapron": {
       "label": "Kontraindikation Cyclokapron",
       "type": "select",
-      "optional": true,
       "options": [
         "Ja",
         "Nein",
@@ -1031,6 +1010,12 @@
       "label": "Rezept abgegeben und erläutert",
       "type": "checkbox",
       "optional": true
+    },
+    "raucher_jahre": {
+      "label": "Rauchdauer (Jahre)",
+      "type": "number",
+      "min": 0,
+      "step": "any"
     }
   },
   "preop": [
@@ -1058,9 +1043,6 @@
         "untersuchung_hals",
         "untersuchung_bauch",
         "untersuchung_sturz"
-      ],
-      "detail": [
-        "Optionale Befunde. Geschlechtsspezifische Felder folgen den zentralen Patientenstammdaten; daraus wird keine Aussage über vorhandene Organe abgeleitet."
       ]
     },
     {
@@ -1151,9 +1133,6 @@
     {
       "id": "t1:fb-nrs",
       "title": "Fragebogen NRS (Nutritional Risk Screening)",
-      "detail": [
-        "Die bereitgestellte Checkliste enthält keinen vollständigen NRS-Fragebogen. Den extern erhobenen NRS-Gesamtwert hier erfassen."
-      ],
       "fields": [
         "score_nrs"
       ],
@@ -1172,9 +1151,6 @@
     {
       "id": "t1:fb-stopbang",
       "title": "Fragebogen STOP-BANG",
-      "detail": [
-        "Jede Frage mit Ja oder Nein beantworten. Ab 3 Ja-Antworten ist gemäss BENE-Checkliste die Zuweisung zur OSAS-Abklärung erforderlich."
-      ],
       "fields": [
         "stopbang_snoring",
         "stopbang_tired",
@@ -1291,7 +1267,7 @@
       "id": "t1:kardio",
       "title": "Überprüfung Zuweisung Kardiologie gemäss Weisung „Präoperative kardiale Abklärung“",
       "detail": [
-        "Zuweisung sobald Kriterien erfüllt, oder vorbekannt EF <50% oder mMRC Grad 3/4",
+        "Kardiologische Zuweisung bei akut symptomatischer Herzerkrankung, MET <4, mindestens vier ausgewählten kardialen Risikofaktoren, EF <50 % oder mMRC Grad 3/4.",
         "MET beschreibt die funktionelle Belastbarkeit. >4: gut belastbar; <4: eingeschränkt; um 4: Grenzbereich, fachlich abzuklären. Nicht beurteilbar ergibt keine Entwarnung.",
         "Die Anzahl bezieht sich auf die fünf bereitgestellten Risikofaktoren, nicht auf einen vollständigen RCRI. Klinische Entscheidungshilfe; keine automatische Konsilanordnung. Bestehende EF-/mMRC-Regeln bleiben wirksam."
       ],
@@ -1329,6 +1305,7 @@
       "fields": [
         "raucher_status",
         "raucher_menge",
+        "raucher_jahre",
         "raucher_py",
         "raucher_sistiert_seit"
       ]

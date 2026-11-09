@@ -47,7 +47,8 @@ def _pneumo_disease(answers):
 
 REQUIRED_IF: dict[str, Callable[[dict], bool]] = {
     "raucher_sistiert_seit": lambda a: str(a.get("raucher_status") or "").startswith("Ex-"),
-    "raucher_menge": lambda a: a.get("raucher_status") == "Aktiver Raucher",
+    "raucher_menge": _smoker,
+    "raucher_jahre": _smoker,
     "raucher_py": _smoker,
     "pneumo_letzte_kontrolle": _pneumo_disease,
     "pneumo_verschlechterung": _pneumo_disease,
@@ -99,7 +100,7 @@ class CardiacScreeningConfig:
 
 
 CARDIAC_SCREENING = CardiacScreeningConfig()
-CARDIAC_CONSULT_MESSAGE = "Kardiologisches Konsil gemäss hinterlegter Screeningregel indiziert."
+CARDIAC_CONSULT_MESSAGE = "Kardiologische Zuweisung erforderlich."
 
 
 def cardiac_assessment(answers, config=CARDIAC_SCREENING):
@@ -119,15 +120,15 @@ def cardiac_assessment(answers, config=CARDIAC_SCREENING):
     risks, risks_valid = choices("kardio_risiken")
     acute, met = answers.get("kardio_akut"), answers.get("kardio_met")
     reasons, pending = [], []
-    if acute == "Ja" or categories:
-        reasons.append("Akut symptomatische Herzerkrankung / positive Kategorie")
+    if acute == "Ja":
+        reasons.append("Akut symptomatische Herzerkrankung")
     if met in config.low_met:
         reasons.append("MET < 4")
-    if met in config.adequate_met and risks_valid and len(risks) > config.risk_threshold:
-        reasons.append("Mehr als drei kardiale Risikofaktoren")
+    if risks_valid and len(risks) > config.risk_threshold:
+        reasons.append(f"{len(risks)} kardiale Risikofaktoren ausgewählt")
     if acute not in ("Ja", "Nein"):
         pending.append("Akute Herzerkrankungen nicht abschliessend beurteilt.")
-    if not categories_valid or (categories and acute != "Ja"):
+    if acute == "Ja" and not categories_valid:
         pending.append("Hauptantwort und Herzerkrankungskategorien abgleichen.")
     if acute == "Ja" and not categories:
         pending.append("Kategorie der akuten Herzerkrankung ergänzen.")
@@ -137,11 +138,22 @@ def cardiac_assessment(answers, config=CARDIAC_SCREENING):
         pending.append("Kardiale Risikofaktoren vollständig überprüfen.")
     return {
         "status": "consult" if reasons else "review" if pending else "no_recommendation",
+        "riskLabels": [label for label in fields["kardio_risiken"]["options"] if label in risks],
         "riskCount": len(risks) if risks_valid else None,
         "riskAssessmentComplete": answers.get("kardio_risiken_beurteilt") == "Ja" and risks_valid,
         "reasons": reasons, "pending": pending,
         "message": CARDIAC_CONSULT_MESSAGE if reasons else "Abklärung / Vervollständigung erforderlich." if pending else "Keine automatische Konsilempfehlung aus den ergänzten Screeningregeln.",
     }
+
+
+def cardiac_referral_text(answers, labs):
+    assessment = cardiac_assessment(answers)
+    lines = [f"Bitte um präoperative kardiale Abklärung. EF: {_value(answers, 'kardio_ef')} %. "
+             f"mMRC: {_value(answers, 'score_mmrc')}."]
+    lines.extend(assessment["reasons"])
+    if assessment["riskLabels"]:
+        lines.append("Kardiale Risikofaktoren: " + ", ".join(assessment["riskLabels"]) + ".")
+    return "\n".join(lines)
 
 
 def bowel_guidance(answers, op_date):
@@ -277,9 +289,7 @@ REFERRALS = [
     Referral(
         "kardio", "Kardiologie",
         lambda a, flags, today: flags["kardio"] or flags["cardiac_screening"],
-        lambda a, labs: f"Bitte um präoperative kardiale Abklärung gemäss Weisung. EF: {_value(a, 'kardio_ef')} %. "
-        f"mMRC: {_value(a, 'score_mmrc')}. "
-        + cardiac_assessment(a)["message"] + " " + "; ".join(cardiac_assessment(a)["reasons"]),
+        cardiac_referral_text,
     ),
     Referral(
         "rauchstopp", "Rauchstopp",

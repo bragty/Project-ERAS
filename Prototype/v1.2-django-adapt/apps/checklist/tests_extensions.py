@@ -28,19 +28,19 @@ class ScreeningExtensionsTests(SimpleTestCase):
                          kardio_risiken_beurteilt=reviewed,
                          kardio_kategorien=CATEGORIES[:1] if acute == 'Ja' else [])
                 result = cardiac_assessment(a)
-                indication = acute == 'Ja' or met == 'lt4' or (met == 'gt4' and count > 3)
+                indication = acute == 'Ja' or met == 'lt4' or count > 3
                 complete = acute in {'Ja', 'Nein'} and met in {'gt4', 'lt4'} and reviewed == 'Ja'
                 self.assertEqual(result['status'], 'consult' if indication else 'no_recommendation' if complete else 'review')
                 self.assertEqual(result['riskCount'], count)
 
-    def test_contradictory_positive_category_is_never_suppressed(self):
+    def test_hidden_category_is_ignored(self):
         for category in CATEGORIES:
             result = cardiac_assessment(dict(kardio_akut='Nein', kardio_met='gt4',
                 kardio_kategorien=[category], kardio_risiken_beurteilt='Ja'))
-            self.assertEqual(result['status'], 'consult')
-            self.assertTrue(result['pending'])
+            self.assertEqual(result['status'], 'no_recommendation')
+            self.assertFalse(result['pending'])
         mixed = cardiac_assessment({'kardio_kategorien':[CATEGORIES[0], {'invalid':True}]})
-        self.assertEqual(mixed['status'], 'consult')
+        self.assertEqual(mixed['status'], 'review')
         self.assertTrue(mixed['pending'])
 
     def test_malformed_and_duplicate_risks_are_not_a_zero_risk_result(self):
@@ -108,7 +108,8 @@ class ClinicalExtensionsPersistenceTests(TestCase):
         self.assertNotIn('anamnese_aerzte', self.client.get(other_url).json()['state']['answers'])
 
     def test_male_optional_fields_preserve_values_across_context_changes(self):
-        state = self.put({'answers':{'stopbang_sex':'1', 'anamnese_shim':'12', 'untersuchung_prostata':'35.5'},
+        state = self.put({'answers':{'stopbang_sex':'1', 'anamnese_shim':'12', 'anamnese_sozial':'QA', 'anamnese_miktion':'QA',
+                          'anamnese_stuhl':'QA', 'anamnese_gewichtsverlust':'QA', 'untersuchung_prostata':'35.5'},
                           'checked':{'t1:anamnese-alltag':True}})['state']
         self.assertTrue(state['checked']['t1:anamnese-alltag'])
         self.patient.sex='female'
@@ -116,7 +117,7 @@ class ClinicalExtensionsPersistenceTests(TestCase):
         state = self.put(state)['state']
         self.assertEqual(state['answers']['untersuchung_prostata'], '35.5')
         self.assertEqual(state['answers']['anamnese_shim'], '12')
-        for key in ('untersuchung_prostata', 'anamnese_shim', 'anamnese_erektion'):
+        for key in ('untersuchung_prostata', 'anamnese_erektion'):
             self.assertIsNone(_validate_field(key, '', {'stopbang_sex':'1'}))
 
     def test_all_numeric_and_date_fields_reject_changed_invalid_input(self):
@@ -222,9 +223,9 @@ class ClinicalExtensionsPersistenceTests(TestCase):
             result = self.put({'answers':answers})
             self.assertTrue(next(r for r in result['derived']['referrals'] if r['id']=='kardio')['required'])
 
-    def test_inconsistent_screening_blocks_completion_but_keeps_positive_hint(self):
+    def test_hidden_categories_do_not_block_completion(self):
         result = self.put({'checked':{'t1:kardio':True}, 'answers':{
             'kardio_ef':'55', 'score_mmrc':'0', 'kardio_akut':'Nein', 'kardio_met':'gt4',
             'kardio_kategorien':CATEGORIES[:1], 'kardio_risiken_beurteilt':'Ja'}})
-        self.assertNotIn('t1:kardio', result['state']['checked'])
-        self.assertEqual(result['derived']['cardiac']['status'], 'consult')
+        self.assertIn('t1:kardio', result['state']['checked'])
+        self.assertEqual(result['derived']['cardiac']['status'], 'no_recommendation')

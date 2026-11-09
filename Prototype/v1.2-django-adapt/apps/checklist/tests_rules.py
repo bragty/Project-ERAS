@@ -44,7 +44,7 @@ class RuleTests(SimpleTestCase):
         self.assertFalse(required("thrombo_eGFR", {}))
         self.assertFalse(required("raucher_py", {"raucher_status": "Nieraucher"}))
         self.assertTrue(required("raucher_py", {"raucher_status": "Ex-Raucher, sistiert >1 Jahr"}))
-        self.assertFalse(required("raucher_menge", {"raucher_status": "Ex-Raucher, sistiert <1 Jahr"}))
+        self.assertTrue(required("raucher_menge", {"raucher_status": "Ex-Raucher, sistiert <1 Jahr"}))
         self.assertTrue(required("raucher_menge", {"raucher_status": "Aktiver Raucher"}))
         self.assertTrue(required("raucher_sistiert_seit", {"raucher_status": "Ex-Raucher, sistiert <1 Jahr"}))
         self.assertFalse(required("raucher_sistiert_seit", {"raucher_status": "Aktiver Raucher"}))
@@ -115,10 +115,16 @@ class EngineRuleTests(TestCase):
         self.assertTrue(osas["required"])
         self.assertEqual(next(r for r in derived["referrals"] if r["id"] == "ernaehrung")["dateField"], "ernaehrung_termin")
 
+    def test_bmi_cutoffs_use_unrounded_measurements(self):
+        for weight, g8, stop in ((75.9, "0", "0"), (76, "1", "0"), (84, "2", "0"),
+                                 (92, "3", "0"), (140, "3", "0"), (140.1, "3", "1")):
+            answers = self.put({"answers": {"vital_gewicht": str(weight), "vital_groesse": "200"}})["state"]["answers"]
+            self.assertEqual((answers["g8_bmi"], answers["stopbang_bmi"]), (g8, stop))
+
     def test_refused_tick_returns_the_reasons(self):
         payload = self.put({"checked": {"t1:raucher": True}, "answers": {"raucher_status": "Aktiver Raucher"}})
         self.assertNotIn("t1:raucher", payload["state"]["checked"])
-        self.assertEqual(payload["validationErrors"]["t1:raucher"], {"raucher_menge": "Pflichtfeld.", "raucher_py": "Pflichtfeld."})
+        self.assertEqual(payload["validationErrors"]["t1:raucher"], {"raucher_menge": "Pflichtfeld.", "raucher_jahre": "Pflichtfeld.", "raucher_py": "Pflichtfeld."})
 
     def test_step_is_validated_like_the_browser_did(self):
         vitals = {"vital_rr_sys": "120", "vital_rr_dia": "80", "vital_puls": "70", "vital_spo2": "98",

@@ -225,14 +225,39 @@ def main():
                     page.locator('[data-checkbox-key="stuhl_rezept"]').check()
                     expect(page.locator('[data-bowel-result]')).to_contain_text('2 Beutel')
                     expect(page.locator('[data-bowel-result]')).to_contain_text('2026-11-07')
+                    def field(key):
+                        return page.locator(f'[data-fkey="{key}"]')
+
+                    field('vital_groesse').fill('180')
+                    field('vital_gewicht').fill('81')
+                    expect(field('g8_bmi')).to_have_value('3')
+                    expect(field('stopbang_bmi')).to_have_value('0')
+                    field('vital_gewicht').fill('120')
+                    expect(field('stopbang_bmi')).to_have_value('1')
+                    field('raucher_status').select_option('Ex-Raucher, sistiert <1 Jahr')
+                    expect(field('raucher_sistiert_seit')).to_be_visible()
+                    field('raucher_menge').fill('10')
+                    field('raucher_jahre').fill('15')
+                    expect(field('raucher_py')).to_have_value('7.5')
+                    field('raucher_status').select_option('Nieraucher')
+                    for key in ('raucher_menge', 'raucher_jahre', 'raucher_py', 'raucher_sistiert_seit'):
+                        expect(field(key)).to_be_hidden()
+                    field('kardio_akut').select_option('Ja')
+                    categories = page.locator('[data-multi-key="kardio_kategorien"]').first
+                    expect(categories).to_be_visible()
                     page.locator('[data-fkey="kardio_akut"]').select_option('Nein')
+                    expect(categories).to_be_hidden()
                     page.locator('[data-fkey="kardio_met"]').select_option('gt4')
                     page.locator('[data-fkey="kardio_risiken_beurteilt"]').select_option('Ja')
                     risks = page.locator('[data-multi-key="kardio_risiken"]')
                     for index in range(4):
                         risks.nth(index).check()
-                    expect(page.locator('[data-cardiac-result]')).to_contain_text('Kardiologisches Konsil gemäss')
+                    expect(page.locator('[data-cardiac-result]')).to_contain_text('Kardiologische Zuweisung erforderlich')
                     expect(page.locator('[data-cardiac-result]')).to_contain_text('4 (vollständig überprüft)')
+                    referral = page.locator('[data-referral-id="kardio"] textarea').input_value()
+                    for index in range(4):
+                        assert risks.nth(index).input_value() in referral
+                    assert risks.nth(4).input_value() not in referral
                     expect(page.locator('#saveState')).not_to_contain_text('speichere')
                     page.reload()
                     expect(prostate).to_have_value('35.5')
