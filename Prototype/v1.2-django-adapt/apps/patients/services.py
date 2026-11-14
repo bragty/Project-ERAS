@@ -1,3 +1,4 @@
+import re
 from datetime import date
 
 from django.db import IntegrityError, transaction
@@ -36,8 +37,7 @@ def _parse_iso_date(value, field_name="opDate"):
         ) from exc
 
 
-PATIENT_TEXT_FIELDS = {"name": (Patient, "name"), "patientNumber": (Patient, "patient_number"),
-    "caseNumber": (TreatmentCase, "case_number"), "beneNurse": (TreatmentCase, "bene_nurse"),
+PATIENT_TEXT_FIELDS = {"patientNumber": (Patient, "patient_number"), "beneNurse": (TreatmentCase, "bene_nurse"),
     "beneDeputy": (TreatmentCase, "bene_deputy"), "surgeon": (TreatmentCase, "surgeon"),
     "procedure": (TreatmentCase, "procedure")}
 
@@ -56,9 +56,8 @@ def _validate_patient_payload(payload, *, creating):
             errors[key] = "Bitte Text eingeben."
         elif len(payload[key].strip()) > limit:
             errors[key] = f"Bitte höchstens {limit} Zeichen eingeben."
-    for key, label in (("name", "Name"), ("caseNumber", "Fallnummer")):
-        if (creating or key in payload) and not _clean_text(payload.get(key)):
-            errors[key] = f"{label} ist erforderlich."
+    if (creating or "patientNumber" in payload) and not _clean_text(payload.get("patientNumber")) and "patientNumber" not in errors:
+        errors["patientNumber"] = "Patienten-ID ist erforderlich."
     if (creating or "sex" in payload) and payload.get("sex") not in Patient.Sex.values:
         # Existing patients may retain an unknown value while other data is edited.
         if creating or payload.get("sex") != "":
@@ -147,41 +146,36 @@ def _procedure_type(payload):
     return ProcedureType.objects.filter(name__iexact=name).first() if name else None
 
 
+def next_case_number(patient):
+    """Technical case number per patient ID: ``<Patienten-ID>-<laufende Nummer>``.
+
+    Only characters that are safe in URL paths are used, because the API
+    addresses cases by this number. It is never shown in the application.
+    """
+    base = re.sub(r"[^A-Za-z0-9._-]+", "_", patient.patient_number or "P")[:55] or "P"
+    number = patient.cases.count() + 1
+    while TreatmentCase.objects.filter(case_number=f"{base}-{number}").exists():
+        number += 1
+    return f"{base}-{number}"
+
+
 @transaction.atomic
 def create_patient_case(payload):
     _validate_patient_payload(payload, creating=True)
-    name = _clean_text(payload.get("name"))
-    case_number = _clean_text(payload.get("caseNumber"))
-    patient_number = _clean_text(payload.get("patientNumber")) or None
+    patient_number = _clean_text(payload.get("patientNumber"))
 
-    if TreatmentCase.objects.filter(case_number=case_number).exists():
-        raise ApiError(
-            "Diese Fallnummer existiert bereits.",
-            status=409,
-            code="duplicate_case_number",
-            fields={"caseNumber": "Bereits vorhanden."},
-        )
-
-    patient = None
-    if patient_number:
-        patient = Patient.objects.select_for_update().filter(patient_number=patient_number).first()
-        if patient and patient.name.casefold() != name.casefold():
-            raise ApiError(
-                "Die Patientennummer ist bereits mit einem anderen Namen verknüpft.",
-                status=409,
-                code="patient_number_conflict",
-                fields={"patientNumber": "Bereits einem anderen Patienten zugeordnet."},
-            )
-        if patient and patient.sex and patient.sex != payload["sex"]:
+    patient = Patient.objects.select_for_update().filter(patient_number=patient_number).first()
+    if patient:
+        if patient.sex and patient.sex != payload["sex"]:
             raise ApiError("Das Geschlecht weicht von den gespeicherten Stammdaten ab. Bitte den bestehenden Patienten bearbeiten.",
                            status=409, code="patient_sex_conflict", fields={"sex": "Abweichung zu vorhandenen Stammdaten."})
 
     if patient is None:
         try:
-            patient = Patient.objects.create(name=name, patient_number=patient_number, sex=payload["sex"])
+            patient = Patient.objects.create(patient_number=patient_number, sex=payload["sex"])
         except IntegrityError as exc:
             raise ApiError(
-                "Die Patientennummer existiert bereits.",
+                "Die Patienten-ID existiert bereits.",
                 status=409,
                 code="duplicate_patient_number",
                 fields={"patientNumber": "Bereits vorhanden."},
@@ -196,7 +190,7 @@ def create_patient_case(payload):
     procedure_type = _procedure_type(payload)
     case = TreatmentCase.objects.create(
         patient=patient,
-        case_number=case_number,
+        case_number=next_case_number(patient),
         bene_nurse=_clean_text(payload.get("beneNurse")),
         bene_deputy=_clean_text(payload.get("beneDeputy")),
         surgeon=_clean_text(payload.get("surgeon")),
@@ -227,14 +221,14 @@ def update_patient_case(treatment_case, payload):
         raise ApiError("Die Fallnummer kann hier nicht geändert werden.", status=422,
                        fields={"caseNumber": "Fallnummer bleibt unverändert."})
     patient_changed, case_changed = [], []
-    for key, attr in (("name", "name"), ("patientNumber", "patient_number"), ("sex", "sex")):
+    for key, attr in (("patientNumber", "patient_number"), ("sex", "sex")):
         if key not in payload:
             continue
         value = _clean_text(payload[key])
         if key == "patientNumber":
             value = value or None
             if value and Patient.objects.exclude(pk=patient.pk).filter(patient_number=value).exists():
-                raise ApiError("Die Patientennummer ist bereits vergeben.", status=409,
+                raise ApiError("Die Patienten-ID ist bereits vergeben.", status=409,
                                fields={"patientNumber": "Bereits einem anderen Patienten zugeordnet."})
         if getattr(patient, attr) != value:
             setattr(patient, attr, value)
@@ -260,7 +254,7 @@ def update_patient_case(treatment_case, payload):
         try:
             patient.save(update_fields=patient_changed + ["updated_at"])
         except IntegrityError as exc:
-            raise ApiError("Die Patientennummer ist bereits vergeben.", status=409,
+            raise ApiError("Die Patienten-ID ist bereits vergeben.", status=409,
                            fields={"patientNumber": "Bereits vorhanden."}) from exc
     if case_changed:
         case.save(update_fields=case_changed + ["updated_at"])

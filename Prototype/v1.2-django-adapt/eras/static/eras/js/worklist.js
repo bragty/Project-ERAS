@@ -10,8 +10,20 @@ function referralById(id){
 function referralStatus(referral){
   return STATE.referrals[referral.id]?.status || (referral.required?'Zuweisung erforderlich':'Noch zu prüfen');
 }
+// Colour coding, so the team sees at a glance where a referral is needed:
+// open = indicated and not yet handled, progress = under way, done = finished.
+const REFERRAL_TONES={'Zuweisung erfolgt':'progress','Termin / Datum ausstehend':'progress','Zuweisung abgeschlossen':'done'};
+function referralTone(referral){
+  const status=referralStatus(referral);
+  if(status==='Zuweisung abgeschlossen')return 'done';
+  if(!referral.required)return REFERRAL_TONES[status]||'none';
+  return REFERRAL_TONES[status]||'open';
+}
 function referralSummary(referral){
-  return `${esc(referral.label)} · ${esc(referralStatus(referral))}${referral.required?' · Indikation erfasst':''}`;
+  return `${esc(referral.label)} · ${esc(referralStatus(referral))}${referral.required?' <span class="referral-badge">Indikation erfasst</span>':''}`;
+}
+function referralClass(referral){
+  return `referral referral-${referralTone(referral)}`;
 }
 function renderWorklist(){
   const el=document.getElementById('worklist'); if(!el) return;
@@ -22,9 +34,9 @@ function renderWorklist(){
   if(signature===renderedWorklist) return;
   renderedWorklist=signature;
   const open=new Set([...el.querySelectorAll('details.referral[open]')].map(d=>d.dataset.referralId));
-  el.innerHTML='<h2>Zuweisungen und Arbeitsliste</h2><p>Status und Termine separat dokumentieren. Text vor Übernahme in KISIM prüfen.</p>'+referrals.map(referral=>{
+  el.innerHTML='<h2>Zuweisungen und Arbeitsliste</h2><p>Status und Termine separat dokumentieren. Text vor Übernahme in KISIM prüfen.</p><p class="worklist-legend"><span style="--legend:#d92d20">Zuweisung nötig</span><span style="--legend:var(--amber)">In Bearbeitung</span><span style="--legend:var(--done)">Abgeschlossen</span></p>'+referrals.map(referral=>{
     const date=referral.dateField ? STATE.answers[referral.dateField] : STATE.referrals[referral.id]?.date;
-    return `<details class="referral" data-referral-id="${referral.id}" ${open.has(referral.id)?'open':''}><summary>${referralSummary(referral)}</summary>
+    return `<details class="${referralClass(referral)}" data-referral-id="${referral.id}" ${open.has(referral.id)?'open':''}><summary>${referralSummary(referral)}</summary>
       <label>Status <select data-referral="${referral.id}" data-property="status">${optionsHTML(REFERRAL_STATUSES,referralStatus(referral))}</select></label>
       <label>Termin <input type="date" data-referral="${referral.id}" data-property="date" value="${esc(date||'')}"></label>
       <textarea rows="5" readonly aria-label="Textbaustein ${esc(referral.label)}">${esc(referral.text)}</textarea><button type="button" class="btn" data-copy-referral="${referral.id}">Text kopieren</button></details>`;
@@ -42,7 +54,11 @@ document.body.addEventListener('change',e=>{
     document.querySelectorAll(`[data-fkey="${referral.dateField}"]`).forEach(field=>{field.value=f.value;field.dispatchEvent(new Event('input',{bubbles:true}));});
     return;
   }
-  if(referral) f.closest('details').querySelector('summary').innerHTML=referralSummary(referral);
+  if(referral){
+    const details=f.closest('details');
+    details.className=referralClass(referral);
+    details.querySelector('summary').innerHTML=referralSummary(referral);
+  }
   scheduleSave();
 });
 document.body.addEventListener('click',async e=>{

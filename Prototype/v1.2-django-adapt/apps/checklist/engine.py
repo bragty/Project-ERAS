@@ -119,10 +119,9 @@ def _validate_field(key, value, answers, *, validate_hidden=False):
             return "Auswahl enthält doppelte Einträge."
         return None
     if kind == "physicians":
-        if not value and not validate_hidden:
-            return "Pflichtfeld."
-        if value is None:
-            return None
+        required = field_required(key, rule, answers) and not validate_hidden
+        if not value:
+            return "Pflichtfeld." if required else None
         if not isinstance(value, list) or len(value) > 50:
             return "Höchstens 50 behandelnde Ärzte erfassen."
         for row in value:
@@ -132,7 +131,7 @@ def _validate_field(key, value, answers, *, validate_hidden=False):
                 return "Fachrichtung und Name müssen Texte mit höchstens 2000 Zeichen sein."
             if any(v.strip() for v in row.values()) and not all(str(row.get(k, "")).strip() for k in ("specialty", "name")):
                 return "Bei jedem Arzteintrag Fachrichtung und Name ergänzen."
-        if not validate_hidden and not any(row.get("name", "").strip() for row in value):
+        if required and not any(row.get("name", "").strip() for row in value):
             return "Pflichtfeld."
         return None
     if kind == "checkbox":
@@ -262,7 +261,8 @@ def _progress(checked, ids):
 
 
 def _canonical_patient_label(treatment_case):
-    return f"{treatment_case.patient.name} · Fall {treatment_case.case_number}"
+    # Only the patient ID is shown; names and case numbers are not displayed.
+    return f"Patienten-ID {treatment_case.patient.patient_number or 'nicht erfasst'}"
 
 
 def default_state(treatment_case):

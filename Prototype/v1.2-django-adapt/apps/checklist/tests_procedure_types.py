@@ -50,7 +50,7 @@ class ProcedureTypeChecklistTests(TestCase):
         self.procedure_type = ProcedureType.objects.get(name="Funktionelle Zystektomie")
         self.procedure_type.excluded_item_ids = QUESTIONNAIRE_IDS
         self.procedure_type.save()
-        patient = Patient.objects.create(name="Typ Test", patient_number="P-TYP")
+        patient = Patient.objects.create(patient_number="P-TYP")
         self.case = TreatmentCase.objects.create(patient=patient, case_number="F-TYP", procedure_type=self.procedure_type)
 
     def state_url(self):
@@ -90,19 +90,19 @@ class ProcedureTypeChecklistTests(TestCase):
         def create(case_number, **payload):
             return self.client.post(
                 reverse("patients_api:patients"),
-                data=json.dumps({"name": "Neu", "sex": "female", "caseNumber": case_number, **payload}),
+                data=json.dumps({"sex": "female", "patientNumber": case_number, **payload}),
                 content_type="application/json",
             )
 
         response = create("F-1", procedureTypeId=self.procedure_type.pk)
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["case"]["procedure"], "Funktionelle Zystektomie")
-        self.assertEqual(TreatmentCase.objects.get(case_number="F-1").procedure_type, self.procedure_type)
+        self.assertEqual(TreatmentCase.objects.get(patient__patient_number="F-1").procedure_type, self.procedure_type)
         # Older clients send the name only.
         create("F-2", procedure="radikale zystektomie mit neoblase")
-        self.assertEqual(TreatmentCase.objects.get(case_number="F-2").procedure_type.name, "Radikale Zystektomie mit Neoblase")
+        self.assertEqual(TreatmentCase.objects.get(patient__patient_number="F-2").procedure_type.name, "Radikale Zystektomie mit Neoblase")
         self.assertEqual(create("F-3", procedureTypeId=999999).status_code, 400)
-        self.assertFalse(TreatmentCase.objects.filter(case_number="F-3").exists())
+        self.assertFalse(TreatmentCase.objects.filter(patient__patient_number="F-3").exists())
 
     def test_admin_configures_items_and_refreshes_running_cases(self):
         self.client.force_login(User.objects.create_superuser("arzt", "arzt@example.com", "pw"))
@@ -135,7 +135,7 @@ class EmptyProcedureTypeTests(TestCase):
 
     def test_case_without_applicable_items_is_never_complete(self):
         procedure_type = ProcedureType.objects.create(name="Leer", excluded_item_ids=ALL_ITEM_IDS)
-        patient = Patient.objects.create(name="Leer Test", patient_number="P-LEER")
+        patient = Patient.objects.create(patient_number="P-LEER")
         case = TreatmentCase.objects.create(patient=patient, case_number="F-LEER", procedure_type=procedure_type)
         summary = self.client.get(reverse("responses_api:case-state", kwargs={"case_number": case.case_number})).json()["summary"]
         self.assertEqual(summary["totalCount"], 0)

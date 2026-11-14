@@ -15,7 +15,7 @@ from .rules import FLAG_RULES, REQUIRED_IF
 
 FIELD_TYPES = {"number", "date", "select", "text", "textarea", "checkbox", "multiselect", "physicians"}
 FIELD_KEYS = {"label", "type", "options", "min", "max", "step", "placeholder", "readonly", "optional", "maleOnly"}
-ITEM_KEYS = {"id", "title", "detail", "fields", "flagRule", "custom", "questionnaire", "scoring", "widget", "scoreDescription"}
+ITEM_KEYS = {"id", "title", "detail", "fields", "flagRule", "flagAfter", "custom", "questionnaire", "scoring", "widget", "scoreDescription"}
 FIELD_REF_KEYS = {"key", "label", "options"}
 WIDGETS = {"bmi"}
 
@@ -118,6 +118,11 @@ def _check_item(item, prefix, fields, used_fields, errors):
     used_fields.update(keys)
     if "flagRule" in item and item["flagRule"] not in FLAG_RULES:
         errors.append(f"{where}: flagRule {item['flagRule']!r} ist in rules.FLAG_RULES nicht definiert.")
+    if "flagAfter" in item:
+        if "flagRule" not in item:
+            errors.append(f"{where}: 'flagAfter' braucht eine 'flagRule'.")
+        if item["flagAfter"] not in keys:
+            errors.append(f"{where}: flagAfter '{item['flagAfter']}' ist kein Feld dieses Punkts.")
     if "widget" in item and item["widget"] not in WIDGETS:
         errors.append(f"{where}: widget {item['widget']!r} ist unbekannt.")
     if "scoring" in item:

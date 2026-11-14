@@ -57,11 +57,11 @@ def archived_cases_csv(cases):
 
     def rows():
         yield "\ufeff"
-        yield writer.writerow(["Patient-ID", "Patientennummer", "Patientenname", "Geschlecht", "Fall-ID", "Fallnummer",
+        yield writer.writerow(["Patient-UUID", "Patienten-ID", "Geschlecht", "Fall-UUID", "Fallnummer (technisch)",
                                "OP-Datum", "Datengruppe", "Feldpfad", "Bezeichnung", "Datentyp", "Wert"])
         # Read persisted snapshots, never migrate/recompute or save answers while exporting.
         for case in cases.prefetch_related("audit_events").iterator(chunk_size=100):
-            identity = [case.patient_id, case.patient.patient_number or "", case.patient.name,
+            identity = [case.patient_id, case.patient.patient_number or "",
                         case.patient.get_sex_display() or "", case.pk, case.case_number,
                         case.op_date.isoformat() if case.op_date else ""]
             groups = [("Patient", model_data(case.patient)), ("Behandlungsfall", model_data(case))]
@@ -90,9 +90,9 @@ def case_to_dict(case, *, include_deletion=False):
     result = {
         "id": str(case.id),
         "patientId": str(case.patient_id),
-        "name": case.patient.name,
         "patientNumber": case.patient.patient_number or "",
         "sex": case.patient.sex,
+        # Technical key for API calls only; the frontend does not display it.
         "caseNumber": case.case_number,
         "opDate": case.op_date.isoformat() if case.op_date else "",
         "procedure": case.procedure_type.name if case.procedure_type else case.procedure,

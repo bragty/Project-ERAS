@@ -7,18 +7,16 @@
       <div class="modal-body">
         <form id="patientForm" novalidate>
         <p id="patientFormMessage" class="form-message" role="alert" hidden></p>
-        <p id="patientEditHint" hidden>Name, Patientennummer und Geschlecht gelten für alle Fälle dieses Patienten.</p>
+        <p id="patientEditHint" hidden>Patienten-ID und Geschlecht gelten für alle Fälle dieses Patienten.</p>
         <div class="modal-grid">
           <label class="field"><span>BENE-Nurse</span><input id="newBeneNurse" type="text"></label>
           <label class="field"><span>BENE-Nurse Stellvertretung</span><input id="newBeneDeputy" type="text"></label>
           <label class="field"><span>Operateur</span><input id="newSurgeon" type="text"></label>
-          <label class="field"><span>Patient*in Name</span><input id="newPatientName" type="text"></label>
           <label class="field"><span>Geschlecht *</span><select id="newPatientSex">
             <option value="">Bitte wählen</option>
             {% for option in patient_form_rules.sexOptions %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}
           </select></label>
-          <label class="field"><span>Patient*in Nummer</span><input id="newPatientNumber" type="text"></label>
-          <label class="field"><span>Patient*in Fallnummer</span><input id="newCaseNumber" type="text"></label>
+          <label class="field"><span>Patienten-ID *</span><input id="newPatientNumber" type="text" required></label>
           <label class="field"><span>OP Datum falls vorhanden</span><input id="newOpDate" type="date"></label>
           <label class="field"><span>Eingriffsart</span>
             <select id="newProcedure">

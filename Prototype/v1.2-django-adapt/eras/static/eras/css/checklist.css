@@ -437,6 +437,19 @@ input.invalid, select.invalid {border:2px solid #b42318; background:#fff1f0;}
 .referral label {display:inline-block; margin:14px 14px 10px 0;}
 .referral textarea {display:block; width:100%; margin:12px 0; padding:12px; box-sizing:border-box;}
 #worklist {margin:36px 0;}
+/* Zuweisungen farblich: offen (indiziert) / in Bearbeitung / abgeschlossen. */
+.referral {border-left-width:6px;}
+.referral-open {border-color:#d92d20; background:#fff1f0;}
+.referral-open summary {color:#9b1c13;}
+.referral-progress {border-color:var(--amber); background:var(--amber-pale);}
+.referral-progress summary {color:#8A4D18;}
+.referral-done {border-color:var(--done); background:#ecfdf3;}
+.referral-done summary {color:#05603a;}
+.referral-badge {display:inline-block; margin-left:6px; padding:1px 8px; border-radius:999px; font-size:12px; font-weight:700; background:#d92d20; color:#fff;}
+.referral-progress .referral-badge {background:var(--amber);}
+.referral-done .referral-badge {background:var(--done);}
+.worklist-legend {display:flex; flex-wrap:wrap; gap:12px; font-size:13px;}
+.worklist-legend span::before {content:""; display:inline-block; width:10px; height:10px; margin-right:6px; border-radius:2px; background:var(--legend);}
 @media print {.item.checked .item-content {display:block;} .questionnaire::details-content {display:block;content-visibility:visible;} }
 
 @media(max-width:600px){.tabs{display:flex;flex-wrap:wrap;}.tab-btn{white-space:normal;min-width:0;flex:1 1 140px;}}

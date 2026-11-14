@@ -362,7 +362,8 @@
       "type": "number",
       "min": 0,
       "max": 100,
-      "step": "any"
+      "step": "any",
+      "optional": true
     },
     "onko_behandler": {
       "label": "Zuständige/r Onkologe/in",
@@ -479,6 +480,7 @@
       "label": "Zigaretten/Tag",
       "type": "number",
       "min": 0,
+      "max": 200,
       "step": "any"
     },
     "raucher_py": {
@@ -754,53 +756,51 @@
     "vital_gewicht": {
       "label": "Gewicht (kg)",
       "type": "number",
-      "min": 0,
+      "min": 20,
+      "max": 300,
       "step": "0.1"
     },
     "vital_groesse": {
       "label": "Körpergrösse (cm)",
       "type": "number",
-      "min": 1,
+      "min": 100,
+      "max": 250,
       "step": "0.1"
     },
     "vital_puls": {
       "label": "Puls (/min)",
       "type": "number",
-      "min": 0,
+      "min": 20,
+      "max": 250,
       "step": "any"
     },
     "vital_rr_dia": {
       "label": "RR diastolisch (mmHg)",
       "type": "number",
-      "min": 0,
+      "min": 20,
+      "max": 200,
       "step": "any"
     },
     "vital_rr_sys": {
       "label": "RR systolisch (mmHg)",
       "type": "number",
-      "min": 0,
+      "min": 50,
+      "max": 300,
       "step": "any"
     },
     "vital_spo2": {
       "label": "SpO2 (%)",
       "type": "number",
-      "min": 0,
+      "min": 50,
       "max": 100,
       "step": "any"
     },
     "vital_temp": {
       "label": "Temperatur (C)",
       "type": "number",
-      "step": "0.1",
-      "min": 0
-    },
-    "untersuchung_prostata": {
-      "label": "Prostatavolumen (ml)",
-      "type": "number",
-      "optional": true,
-      "min": 0,
-      "step": "0.1",
-      "maleOnly": true
+      "min": 30,
+      "max": 45,
+      "step": "0.1"
     },
     "untersuchung_abdomen": {
       "label": "Abdomen / Voroperationen, Narben und Hernien",
@@ -813,30 +813,31 @@
     "untersuchung_hals": {
       "label": "Halsumfang (cm)",
       "type": "number",
-      "min": 0,
+      "min": 20,
+      "max": 100,
       "step": "0.1"
     },
     "untersuchung_bauch": {
       "label": "Bauchumfang (cm)",
       "type": "number",
-      "min": 0,
+      "min": 40,
+      "max": 250,
       "step": "0.1"
-    },
-    "untersuchung_sturz": {
-      "label": "Sturzgefahr – Beurteilung / verwendete Klassifikation",
-      "type": "textarea"
     },
     "anamnese_urologe": {
       "label": "Externer Urologe",
-      "type": "text"
+      "type": "text",
+      "optional": true
     },
     "anamnese_hausarzt": {
       "label": "Hausarzt",
-      "type": "text"
+      "type": "text",
+      "optional": true
     },
     "anamnese_aerzte": {
       "label": "Weitere behandelnde Ärzte",
-      "type": "physicians"
+      "type": "physicians",
+      "optional": true
     },
     "anamnese_sozial": {
       "label": "Beruf / Familie / Wohnsituation",
@@ -1015,6 +1016,7 @@
       "label": "Rauchdauer (Jahre)",
       "type": "number",
       "min": 0,
+      "max": 100,
       "step": "any"
     }
   },
@@ -1037,12 +1039,10 @@
       "id": "t1:untersuchung",
       "title": "Körperliche Untersuchung",
       "fields": [
-        "untersuchung_prostata",
         "untersuchung_abdomen",
         "untersuchung_haut",
         "untersuchung_hals",
-        "untersuchung_bauch",
-        "untersuchung_sturz"
+        "untersuchung_bauch"
       ]
     },
     {
@@ -1267,9 +1267,9 @@
       "id": "t1:kardio",
       "title": "Überprüfung Zuweisung Kardiologie gemäss Weisung „Präoperative kardiale Abklärung“",
       "detail": [
-        "Kardiologische Zuweisung bei akut symptomatischer Herzerkrankung, MET <4, mindestens vier ausgewählten kardialen Risikofaktoren, EF <50 % oder mMRC Grad 3/4.",
-        "MET beschreibt die funktionelle Belastbarkeit. >4: gut belastbar; <4: eingeschränkt; um 4: Grenzbereich, fachlich abzuklären. Nicht beurteilbar ergibt keine Entwarnung.",
-        "Die Anzahl bezieht sich auf die fünf bereitgestellten Risikofaktoren, nicht auf einen vollständigen RCRI. Klinische Entscheidungshilfe; keine automatische Konsilanordnung. Bestehende EF-/mMRC-Regeln bleiben wirksam."
+        "Kardiologische Zuweisung bei EF <50 % oder mMRC Grad 3/4, akut symptomatischer Herzerkrankung, MET <4 oder mindestens drei ausgewählten kardialen Risikofaktoren.",
+        "MET beschreibt die funktionelle Belastbarkeit. >4 und um 4 (z. B. zwei Stockwerke Treppensteigen) werden gleich bewertet: Dann entscheiden die kardialen Risikofaktoren. <4: eingeschränkt belastbar. Nicht beurteilbar ergibt keine Entwarnung.",
+        "Die Anzahl bezieht sich auf die fünf bereitgestellten Risikofaktoren, nicht auf einen vollständigen RCRI. Klinische Entscheidungshilfe; keine automatische Konsilanordnung. EF ist optional, mMRC bleibt Pflichtfeld."
       ],
       "fields": [
         "kardio_ef",
@@ -1292,6 +1292,7 @@
         "kardio_risiken_beurteilt"
       ],
       "flagRule": "kardio",
+      "flagAfter": "score_mmrc",
       "custom": "cardiac"
     },
     {

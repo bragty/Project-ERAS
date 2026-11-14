@@ -28,7 +28,7 @@ class ChecklistStateAdmin(admin.ModelAdmin):
         "updated_at",
     )
     list_filter = ("complete", "schema_version")
-    search_fields = ("treatment_case__case_number", "treatment_case__patient__name")
+    search_fields = ("treatment_case__case_number", "treatment_case__patient__patient_number")
     list_select_related = ("treatment_case__patient",)
     fields = (
         "treatment_case",

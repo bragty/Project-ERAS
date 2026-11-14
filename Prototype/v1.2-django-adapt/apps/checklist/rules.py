@@ -94,9 +94,11 @@ def _kardio(a):
 
 @dataclass(frozen=True)
 class CardiacScreeningConfig:
-    risk_threshold: int = 3  # strictly more than three, per supplied specification
+    # Meeting 13.11.2026: at least three selected risk factors trigger the consult.
+    risk_threshold: int = 3
     low_met: tuple[str, ...] = ("lt4",)
-    adequate_met: tuple[str, ...] = ("gt4",)
+    # "MET um 4" has the same consequences as "MET > 4": the risk factors decide.
+    adequate_met: tuple[str, ...] = ("gt4", "around4")
 
 
 CARDIAC_SCREENING = CardiacScreeningConfig()
@@ -124,7 +126,7 @@ def cardiac_assessment(answers, config=CARDIAC_SCREENING):
         reasons.append("Akut symptomatische Herzerkrankung")
     if met in config.low_met:
         reasons.append("MET < 4")
-    if risks_valid and len(risks) > config.risk_threshold:
+    if risks_valid and len(risks) >= config.risk_threshold:
         reasons.append(f"{len(risks)} kardiale Risikofaktoren ausgewählt")
     if acute not in ("Ja", "Nein"):
         pending.append("Akute Herzerkrankungen nicht abschliessend beurteilt.")
@@ -133,7 +135,7 @@ def cardiac_assessment(answers, config=CARDIAC_SCREENING):
     if acute == "Ja" and not categories:
         pending.append("Kategorie der akuten Herzerkrankung ergänzen.")
     if met not in config.low_met + config.adequate_met:
-        pending.append("MET um 4 fachlich abklären." if met == "around4" else "MET nicht abschliessend beurteilt.")
+        pending.append("MET nicht abschliessend beurteilt.")
     if answers.get("kardio_risiken_beurteilt") != "Ja" or not risks_valid:
         pending.append("Kardiale Risikofaktoren vollständig überprüfen.")
     return {

@@ -1,7 +1,7 @@
 {% extends "eras/base.html" %}
 {% load static %}
 
-{% block extra_css %}<link rel="stylesheet" href="{% static 'eras/css/frontpage.css' %}?v=20261101-sidebar">{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'eras/css/frontpage.css' %}?v=20261114-patient-id">{% endblock %}
 
 {% block header %}{% include "eras/includes/frontpage_header.html" %}{% endblock %}
 
@@ -13,7 +13,6 @@
       <nav>
         <button type="button" class="sidebar-link" id="overviewNav" aria-current="page"><span aria-hidden="true">▦</span>Übersicht</button>
         <button type="button" class="sidebar-link" id="archiveFilter"><span aria-hidden="true">▣</span>Archiv</button>
-        <a class="sidebar-link" href="{% url 'admin:index' %}"><span aria-hidden="true">⚙</span>Admin-Einstellungen</a>
       </nav>
     </aside>
     <div class="workspace-content">
@@ -29,7 +28,7 @@
         <div class="actions" data-checklist-url="{% url 'eras:checklist' %}">
           <label class="field">
             <span>Patientenauswahl</span>
-            <input id="patientSearch" type="search" placeholder="Name, Fallnummer, Patientennummer oder Eingriff suchen" autocomplete="off">
+            <input id="patientSearch" type="search" placeholder="Patienten-ID, Operateur oder Eingriff suchen" autocomplete="off">
           </label>
           <button type="button" class="btn primary" id="newPatientBtn">Neu Patient erfassen</button>
         </div>
@@ -38,8 +37,9 @@
           <label class="field"><span>OP-Datum</span><select id="opDateStatus"><option value="all">Alle Fälle</option><option value="dated">Mit OP-Datum</option><option value="missing">Ohne OP-Datum</option></select></label>
           <label class="field"><span>OP-Datum von</span><input type="date" id="opDateFrom" aria-describedby="patientFilterError"></label>
           <label class="field"><span>OP-Datum bis</span><input type="date" id="opDateTo" aria-describedby="patientFilterError"></label>
+          <label class="field"><span>Operateur</span><select id="surgeonFilter"><option value="">Alle Operateure</option><option value="__none__">Ohne Operateur</option></select></label>
           <label class="field"><span>Progression</span><select id="progressStatus"><option value="all">Alle Stände</option><option value="open">Unvollständig</option><option value="complete">Abgeschlossen</option><option value="not_started">Noch nicht begonnen (0 %)</option></select></label>
-          <label class="field"><span>Sortieren nach</span><select id="patientSort"><option value="op_asc">OP-Datum: frühestes zuerst</option><option value="op_desc">OP-Datum: spätestes zuerst</option><option value="progress_asc">Progression: aufsteigend</option><option value="progress_desc">Progression: absteigend</option><option value="name_asc">Name: A–Z</option><option value="name_desc">Name: Z–A</option><option value="updated_desc">Zuletzt geänderte zuerst</option></select></label>
+          <label class="field"><span>Sortieren nach</span><select id="patientSort"><option value="op_asc">OP-Datum: frühestes zuerst</option><option value="op_desc">OP-Datum: spätestes zuerst</option><option value="progress_asc">Progression: aufsteigend</option><option value="progress_desc">Progression: absteigend</option><option value="patient_asc">Patienten-ID: aufsteigend</option><option value="patient_desc">Patienten-ID: absteigend</option><option value="surgeon_asc">Operateur: A–Z</option><option value="surgeon_desc">Operateur: Z–A</option><option value="updated_desc">Zuletzt geänderte zuerst</option></select></label>
           <button type="button" class="btn" id="resetPatientFilters">Filter zurücksetzen</button>
         </div>
         <p class="field-error" id="patientFilterError" role="alert" hidden></p>
@@ -51,8 +51,8 @@
         <div class="search-results" id="patientSearchResults" aria-live="polite"></div>
 
         <div class="patient-preview" aria-live="polite">
-          <div class="preview-box"><span>Patient*in</span><strong id="previewName">-</strong></div>
-          <div class="preview-box"><span>Fallnummer</span><strong id="previewCase">-</strong></div>
+          <div class="preview-box"><span>Patienten-ID</span><strong id="previewPatientNumber">-</strong></div>
+          <div class="preview-box"><span>Operateur</span><strong id="previewSurgeon">-</strong></div>
           <div class="preview-box"><span>OP Datum</span><strong id="previewOpDate">-</strong></div>
           <div class="preview-box"><span>Eingriffsart</span><strong id="previewProcedure">-</strong></div>
         </div>
@@ -63,4 +63,4 @@
 {% include "eras/includes/patient_modal.html" %}
 {% endblock %}
 
-{% block extra_js %}<script src="{% static 'eras/js/frontpage.js' %}?v=20261101-sidebar" defer></script>{% endblock %}
+{% block extra_js %}<script src="{% static 'eras/js/frontpage.js' %}?v=20261114-patient-id" defer></script>{% endblock %}

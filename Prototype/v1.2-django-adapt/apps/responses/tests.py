@@ -9,7 +9,7 @@ from apps.responses.models import ChecklistState
 
 class ChecklistStateApiTests(TestCase):
     def setUp(self):
-        patient = Patient.objects.create(name="Muster Anna", patient_number="P-10021")
+        patient = Patient.objects.create(patient_number="P-10021")
         self.case = TreatmentCase.objects.create(patient=patient, case_number="F-78342")
 
     def state_url(self):

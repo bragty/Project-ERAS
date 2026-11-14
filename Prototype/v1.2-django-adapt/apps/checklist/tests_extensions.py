@@ -28,8 +28,9 @@ class ScreeningExtensionsTests(SimpleTestCase):
                          kardio_risiken_beurteilt=reviewed,
                          kardio_kategorien=CATEGORIES[:1] if acute == 'Ja' else [])
                 result = cardiac_assessment(a)
-                indication = acute == 'Ja' or met == 'lt4' or count > 3
-                complete = acute in {'Ja', 'Nein'} and met in {'gt4', 'lt4'} and reviewed == 'Ja'
+                # Meeting 13.11.2026: "MET um 4" counts like "MET > 4"; three risk factors suffice.
+                indication = acute == 'Ja' or met == 'lt4' or count >= 3
+                complete = acute in {'Ja', 'Nein'} and met in {'gt4', 'around4', 'lt4'} and reviewed == 'Ja'
                 self.assertEqual(result['status'], 'consult' if indication else 'no_recommendation' if complete else 'review')
                 self.assertEqual(result['riskCount'], count)
 
@@ -51,10 +52,20 @@ class ScreeningExtensionsTests(SimpleTestCase):
         for value in ({}, [], True, 42):
             self.assertEqual(cardiac_assessment({'kardio_akut':value, 'kardio_met':value})['status'], 'review')
 
-    def test_threshold_is_configurable_and_strict(self):
-        a = dict(kardio_akut='Nein', kardio_met='gt4', kardio_risiken=RISKS[:3], kardio_risiken_beurteilt='Ja')
+    def test_threshold_is_configurable_and_inclusive(self):
+        a = dict(kardio_akut='Nein', kardio_met='gt4', kardio_risiken=RISKS[:2], kardio_risiken_beurteilt='Ja')
         self.assertEqual(cardiac_assessment(a)['status'], 'no_recommendation')
         self.assertEqual(cardiac_assessment(a, CardiacScreeningConfig(risk_threshold=2))['status'], 'consult')
+        a['kardio_risiken'] = RISKS[:3]
+        self.assertEqual(cardiac_assessment(a)['status'], 'consult')
+        self.assertIn('3 kardiale Risikofaktoren ausgewählt', cardiac_assessment(a)['reasons'])
+
+    def test_met_around_four_has_the_same_consequences_as_above_four(self):
+        for count in range(6):
+            results = [cardiac_assessment(dict(kardio_akut='Nein', kardio_met=met, kardio_risiken=RISKS[:count],
+                                               kardio_risiken_beurteilt='Ja')) for met in ('gt4', 'around4')]
+            self.assertEqual(results[0], results[1])
+            self.assertEqual(results[0]['status'], 'consult' if count >= 3 else 'no_recommendation')
 
     def test_bowel_yes_no_unknown_and_operation_dates(self):
         for status, dose in [('Ja', 2), ('Nein', 1), ('Unbekannt', None), ('', None)]:
@@ -72,7 +83,7 @@ class ScreeningExtensionsTests(SimpleTestCase):
 
 class ClinicalExtensionsPersistenceTests(TestCase):
     def setUp(self):
-        self.patient = Patient.objects.create(name='Extension QA', sex='male')
+        self.patient = Patient.objects.create(sex='male')
         self.case = TreatmentCase.objects.create(patient=self.patient, case_number='EXT-QA', op_date=date(2026, 11, 2))
         self.url = reverse('responses_api:case-state', kwargs={'case_number': self.case.case_number})
 
@@ -88,7 +99,7 @@ class ClinicalExtensionsPersistenceTests(TestCase):
             if key.startswith(('anamnese_', 'untersuchung_', 'stuhl_')) or key in {
                 'kardio_akut','kardio_met','kardio_risiken','kardio_kategorien','kardio_bemerkung','kardio_risiken_beurteilt'
             }:
-                answers[key] = {'number':'12', 'text':'QA', 'textarea':'Mehrzeilig\nQA',
+                answers[key] = {'number':str(max(12, spec.get('min', 0))), 'text':'QA', 'textarea':'Mehrzeilig\nQA',
                     'physicians':[{'specialty':'Urologie', 'name':'QA'}], 'checkbox':'Ja',
                     'select':spec.get('options', [''])[0], 'multiselect':spec.get('options', [])[:1]}[spec['type']]
         answers['kardio_met'] = 'lt4'
@@ -109,15 +120,15 @@ class ClinicalExtensionsPersistenceTests(TestCase):
 
     def test_male_optional_fields_preserve_values_across_context_changes(self):
         state = self.put({'answers':{'stopbang_sex':'1', 'anamnese_shim':'12', 'anamnese_sozial':'QA', 'anamnese_miktion':'QA',
-                          'anamnese_stuhl':'QA', 'anamnese_gewichtsverlust':'QA', 'untersuchung_prostata':'35.5'},
+                          'anamnese_stuhl':'QA', 'anamnese_gewichtsverlust':'QA', 'anamnese_erektion':'QA'},
                           'checked':{'t1:anamnese-alltag':True}})['state']
         self.assertTrue(state['checked']['t1:anamnese-alltag'])
         self.patient.sex='female'
         self.patient.save(update_fields=['sex'])
         state = self.put(state)['state']
-        self.assertEqual(state['answers']['untersuchung_prostata'], '35.5')
+        self.assertEqual(state['answers']['anamnese_erektion'], 'QA')
         self.assertEqual(state['answers']['anamnese_shim'], '12')
-        for key in ('untersuchung_prostata', 'anamnese_erektion'):
+        for key in ('anamnese_erektion',):
             self.assertIsNone(_validate_field(key, '', {'stopbang_sex':'1'}))
 
     def test_all_numeric_and_date_fields_reject_changed_invalid_input(self):
@@ -136,12 +147,21 @@ class ClinicalExtensionsPersistenceTests(TestCase):
                     self.assertEqual(response.status_code,422)
                     self.assertFalse(ChecklistState.objects.filter(treatment_case=self.case).exists())
 
-    def test_large_positive_values_do_not_gain_unapproved_medical_limits(self):
-        result=self.put({'answers':{'vital_gewicht':'300.5','vital_rr_sys':'350','untersuchung_bauch':'220.0'}})
-        self.assertEqual(result['state']['answers']['vital_rr_sys'],'350')
+    def test_implausible_measurements_are_rejected(self):
+        # Plausibility limits agreed after the meeting of 13.11.2026.
+        for key, value in [('vital_gewicht','3000'), ('vital_gewicht','19.9'), ('vital_groesse','17'),
+                           ('vital_rr_sys','350'), ('vital_rr_dia','10'), ('vital_puls','300'),
+                           ('vital_spo2','40'), ('vital_temp','46'), ('untersuchung_hals','150'),
+                           ('untersuchung_bauch','300'), ('raucher_menge','500'), ('raucher_jahre','120')]:
+            with self.subTest(key=key, value=value):
+                response=self.client.put(self.url,data=json.dumps({'state':{'answers':{key:value}}}),content_type='application/json')
+                self.assertEqual(response.status_code,422)
+        result=self.put({'answers':{'vital_gewicht':'300','vital_rr_sys':'300','untersuchung_bauch':'220.0',
+                                    'vital_groesse':'100','vital_temp':'36.8'}})
+        self.assertEqual(result['state']['answers']['vital_gewicht'],'300')
 
     def test_legacy_invalid_values_are_retained_and_do_not_block_other_edits(self):
-        old={'answers':{'vital_spo2':'150','untersuchung_hals':'-1'},'opDate':'unbekannt'}
+        old={'answers':{'vital_spo2':'150','untersuchung_hals':'-1','vital_gewicht':'3000'},'opDate':'unbekannt'}
         ChecklistState.objects.create(treatment_case=self.case,state=old)
         loaded=self.client.get(self.url).json()
         self.assertEqual(loaded['state']['answers']['vital_spo2'],'150')
@@ -150,6 +170,8 @@ class ClinicalExtensionsPersistenceTests(TestCase):
         state['answers']['anamnese_sozial']='Ergänzt'
         saved=self.put(state)
         self.assertEqual(saved['state']['answers']['vital_spo2'],'150')
+        self.assertEqual(saved['state']['answers']['vital_gewicht'],'3000')
+        self.assertIn('vital_gewicht',saved['validationErrors']['t1:vitalparameter'])
         self.assertEqual(saved['state']['opDate'],'unbekannt')
 
     def test_manual_labs_and_worklist_dates_are_validated(self):
@@ -210,7 +232,7 @@ class ClinicalExtensionsPersistenceTests(TestCase):
     def test_completed_screening_and_bowel_status_survive_reload(self):
         saved = self.put({'checked':{'t1:kardio':True, 't1:stuhlregulation':True}, 'answers':{
             'kardio_ef':'55', 'score_mmrc':'0', 'kardio_akut':'Nein', 'kardio_met':'gt4',
-            'kardio_risiken':RISKS[:3], 'kardio_risiken_beurteilt':'Ja',
+            'kardio_risiken':RISKS[:2], 'kardio_risiken_beurteilt':'Ja',
             'stuhl_obstipation':'Nein', 'stuhl_rezept':'Ja'}})
         loaded = self.client.get(self.url).json()
         self.assertTrue(loaded['state']['checked']['t1:kardio'])
@@ -222,6 +244,22 @@ class ClinicalExtensionsPersistenceTests(TestCase):
         for answers in ({'kardio_ef':'49'}, {'kardio_met':'lt4'}):
             result = self.put({'answers':answers})
             self.assertTrue(next(r for r in result['derived']['referrals'] if r['id']=='kardio')['required'])
+
+    def test_ef_is_optional_but_mmrc_stays_required(self):
+        answers = {'score_mmrc':'0', 'kardio_akut':'Nein', 'kardio_met':'around4', 'kardio_risiken_beurteilt':'Ja'}
+        result = self.put({'checked':{'t1:kardio':True}, 'answers':answers})
+        self.assertIn('t1:kardio', result['state']['checked'])
+        self.assertEqual(result['derived']['cardiac']['status'], 'no_recommendation')
+        answers.pop('score_mmrc')
+        result = self.put({'checked':{'t1:kardio':True}, 'answers':answers}, baseRevision=result['revision'])
+        self.assertNotIn('t1:kardio', result['state']['checked'])
+        self.assertIn('score_mmrc', result['validationErrors']['t1:kardio'])
+
+    def test_kardio_hint_is_placed_directly_after_ef_and_mmrc(self):
+        item = next(i for i in base_definition()['preop'] if i['id'] == 't1:kardio')
+        self.assertEqual(item['flagAfter'], 'score_mmrc')
+        keys = [f if isinstance(f, str) else f['key'] for f in item['fields']]
+        self.assertEqual(keys[:2], ['kardio_ef', 'score_mmrc'])
 
     def test_hidden_categories_do_not_block_completion(self):
         result = self.put({'checked':{'t1:kardio':True}, 'answers':{

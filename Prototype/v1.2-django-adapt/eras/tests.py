@@ -30,7 +30,9 @@ class ErasPageTests(TestCase):
         self.assertContains(response, 'id="archiveFilter"')
         self.assertContains(response, 'id="archiveFilter"')
         self.assertContains(response, 'id="overviewNav"')
-        self.assertContains(response, 'Admin-Einstellungen')
+        # The Django admin is not linked from the frontpage (only reachable via /admin/).
+        self.assertNotContains(response, 'Admin-Einstellungen')
+        self.assertNotContains(response, 'href="/admin/"')
         self.assertContains(response, 'id="exportArchiveCsv"')
 
     def test_checklist_without_case_redirects_home(self):

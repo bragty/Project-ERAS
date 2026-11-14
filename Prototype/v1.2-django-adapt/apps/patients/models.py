@@ -4,11 +4,15 @@ from django.db import models
 
 
 class Patient(models.Model):
-    """Stable patient identity. A patient may have multiple treatment cases."""
+    """Stable patient identity. A patient may have multiple treatment cases.
+
+    Data minimisation (meeting 13.11.2026): no patient names are stored. The
+    patient ID is the only identifier shown in the application; it stays
+    nullable for legacy patients until it is filled in.
+    """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=255)
-    patient_number = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    patient_number = models.CharField("Patienten-ID", max_length=64, unique=True, null=True, blank=True)
     class Sex(models.TextChoices):
         MALE = "male", "Männlich"
         FEMALE = "female", "Weiblich"
@@ -19,18 +23,22 @@ class Patient(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["name", "patient_number"]
+        ordering = ["patient_number"]
 
     def __str__(self):
-        return f"{self.name} ({self.patient_number or 'ohne Patientennummer'})"
+        return f"Patienten-ID {self.patient_number or 'nicht erfasst'}"
 
 
 class TreatmentCase(models.Model):
-    """One perioperative case for one patient."""
+    """One perioperative case for one patient.
+
+    The case number is generated per patient ID and only kept for technical
+    traceability (database, audit, export); the application does not show it.
+    """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     patient = models.ForeignKey(Patient, on_delete=models.PROTECT, related_name="cases")
-    case_number = models.CharField(max_length=64, unique=True)
+    case_number = models.CharField("Fallnummer (technisch)", max_length=64, unique=True)
     bene_nurse = models.CharField(max_length=255, blank=True)
     bene_deputy = models.CharField(max_length=255, blank=True)
     surgeon = models.CharField(max_length=255, blank=True)
@@ -58,4 +66,4 @@ class TreatmentCase(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.case_number} · {self.patient.name}"
+        return f"{self.case_number} · {self.patient}"

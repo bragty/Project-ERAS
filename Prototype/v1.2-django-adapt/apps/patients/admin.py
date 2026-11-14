@@ -26,8 +26,8 @@ class TreatmentCaseInline(admin.TabularInline):
 
 @admin.register(Patient)
 class PatientAdmin(admin.ModelAdmin):
-    list_display = ("name", "patient_number", "sex", "case_count", "created_at")
-    search_fields = ("name", "patient_number", "cases__case_number")
+    list_display = ("patient_number", "sex", "case_count", "created_at")
+    search_fields = ("patient_number", "cases__case_number")
     readonly_fields = ("id", "created_at", "updated_at")
     inlines = [TreatmentCaseInline]
 
@@ -67,7 +67,6 @@ class TreatmentCaseAdmin(admin.ModelAdmin):
     list_filter = ("archived", "procedure_type", "checklist_state__complete", "op_date")
     search_fields = (
         "case_number",
-        "patient__name",
         "patient__patient_number",
         "procedure",
         "procedure_type__name",

@@ -12,7 +12,7 @@ from .lab_import.service import _process_pdf
 
 class ImportApiTests(TestCase):
     def setUp(self):
-        patient=Patient.objects.create(name="Import Test",patient_number="P-TEST")
+        patient=Patient.objects.create(patient_number="P-TEST")
         self.case=TreatmentCase.objects.create(patient=patient,case_number="F-TEST")
         self.url=reverse("responses_api:case-state",kwargs={"case_number":self.case.case_number})
 
@@ -62,7 +62,7 @@ class ImportApiTests(TestCase):
 class NoteTests(TestCase):
     def test_notes_are_cut_to_max_length_and_unknown_items_dropped(self):
         from .engine import NOTE_MAX_LENGTH
-        patient = Patient.objects.create(name="Notiz Test", patient_number="P-NOTE")
+        patient = Patient.objects.create(patient_number="P-NOTE")
         case = TreatmentCase.objects.create(patient=patient, case_number="F-NOTE")
         url = reverse("responses_api:case-state", kwargs={"case_number": case.case_number})
         notes = {"t1:diagnosen": "x" * (NOTE_MAX_LENGTH + 50), "t1:pbm": "kurz", "unbekannt": "weg", "t1:medikamente": 42}
@@ -128,7 +128,7 @@ class ChecklistTextTests(TestCase):
         self.assertEqual([item["id"] for _section, item in iter_items(definition)], ALL_ITEM_IDS)
 
     def test_checklist_page_embeds_the_edited_definition(self):
-        patient = Patient.objects.create(name="Text Test", patient_number="P-TEXT")
+        patient = Patient.objects.create(patient_number="P-TEXT")
         TreatmentCase.objects.create(patient=patient, case_number="F-TEXT")
         self.edit("t1:drink|title", "Information <Drink> & Co")
         response = self.client.get(reverse("eras:checklist") + "?case=F-TEXT")

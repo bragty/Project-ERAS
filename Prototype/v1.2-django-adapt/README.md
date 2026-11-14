@@ -4,20 +4,51 @@ Erweiterungen für Untersuchung, Anamnese, Stuhlregulation und kardiologisches
 Assessment: [Implementierungsbericht Oktober 2026](OCTOBER_2026_IMPLEMENTATION.md)
 (Datenfelder, Migration, Regeln, Tests und offene fachliche Fragen).
 
+### Anpassungen aus dem Meeting vom 13. November 2026
+
+- **Datenschutz:** Patientennamen werden nicht mehr gespeichert. Die Migration
+  `patients/0004_remove_patient_name` entfernt die Namensspalte samt Inhalt und
+  ersetzt die alten Bezeichnungen «Name · Fall …» in gespeicherten Checklisten
+  durch «Patienten-ID …». Die Patienten-ID ist bei der Erfassung Pflicht und der
+  einzige angezeigte Identifikator. Die Fallnummer wird pro Patienten-ID
+  automatisch vergeben (`<Patienten-ID>-1`, `-2`, …) und nicht mehr angezeigt.
+  Sie dient nur der technischen Rückverfolgbarkeit (Datenbank, Audit,
+  CSV-Export «Fallnummer (technisch)») und adressiert den Fall in API-URLs.
+  Die Suche umfasst Patienten-ID, Operateur, Eingriff und BENE-Nurse.
+- **Startseite:** Spalte und Filter «Operateur» (inkl. «Ohne Operateur»),
+  Sortierung nach Operateur und Patienten-ID. Fälle ohne Operateur stehen in
+  beiden Sortierrichtungen am Ende.
+- **Körperliche Untersuchung:** Sturzgefahr und Prostatavolumen entfernt.
+  Bereits gespeicherte Altwerte bleiben im JSON-Stand erhalten.
+- **Plausibilitätsgrenzen** in `definition.json`: Gewicht 20–300 kg,
+  Grösse 100–250 cm, RR syst. 50–300 / diast. 20–200 mmHg, Puls 20–250/min,
+  SpO2 50–100 %, Temperatur 30–45 °C, Halsumfang 20–100 cm,
+  Bauchumfang 40–250 cm, Zigaretten/Tag ≤ 200, Rauchdauer ≤ 100 Jahre.
+- **Behandelnde Ärzte** (Urologe, Hausarzt, weitere Ärzte) sind optional.
+- **Kardiologie:** EF ist optional, mMRC bleibt Pflicht. Der Hinweis «EF <50 %
+  oder mMRC Grad 3/4 → Zuweisung Kardiologie erforderlich.» erscheint direkt
+  unter EF/mMRC (`flagAfter` in `definition.json`). «MET um 4» wird wie «MET > 4»
+  behandelt. Ab **drei** ausgewählten Risikofaktoren werden Konsilempfehlung und
+  Zuweisung ausgelöst (vorher: mehr als drei).
+- **Zuweisungen** sind farblich gekennzeichnet: rot = indiziert und offen,
+  orange = in Bearbeitung, grün = abgeschlossen.
+- Noch offen (Prüfung durch das Fachteam bis Ende November): Blutungs- und
+  Thromboserisiko, Liste gültiger Laborwerte, Fenster «Gesamtpfad».
+
 ### Optimierung der Patientenerfassung und Formulare vom 1. November 2026
 
-Die Startseite besitzt eine linke Sidebar mit genau **Übersicht**, **Archiv** und
-**Admin-Einstellungen**. Beide Ansichten verwenden die vorhandene Patiententabelle,
-Vorschau, Bearbeitungs-/Löschdialoge und Archivierungs-/Wiederherstellungsaktionen.
-Auf schmalen Bildschirmen steht die Navigation oberhalb der Tabelle. Der
-Admin-Link verwendet die konfigurierte Django-Admin-Route und deren vorhandenen
-Login. Das Archiv kann direkt mit `/?view=archive` geöffnet werden.
+Die Startseite besitzt eine linke Sidebar mit **Übersicht** und **Archiv**. Der
+Django-Admin ist nicht verlinkt und nur direkt über `/admin/` mit Login
+erreichbar. Beide Ansichten verwenden die vorhandene Patiententabelle, Vorschau,
+Bearbeitungs-/Löschdialoge und Archivierungs-/Wiederherstellungsaktionen. Auf
+schmalen Bildschirmen steht die Navigation oberhalb der Tabelle. Das Archiv kann
+direkt mit `/?view=archive` geöffnet werden.
 
 Die Übersicht und das Archiv lassen sich nach vorhandenem/fehlendem OP-Datum,
-inklusivem OP-Zeitraum und Checklistenstatus filtern. Sortiert werden kann nach
-OP-Datum, Progression und Name in beiden Richtungen sowie zuletzt geänderten
-Fällen. Fehlende OP-Daten stehen in beiden Sortierrichtungen am Ende. Fälle ohne
-Checklistenstand gelten für die Progressionsansicht als 0 % / unvollständig.
+inklusivem OP-Zeitraum, Operateur und Checklistenstatus filtern. Sortiert werden
+kann nach OP-Datum, Progression, Patienten-ID und Operateur in beiden Richtungen
+sowie nach zuletzt geänderten Fällen. Fehlende OP-Daten stehen in beiden
+Sortierrichtungen am Ende. Fälle ohne Checklistenstand gelten für die Progressionsansicht als 0 % / unvollständig.
 Filter und Suche lassen sich kombinieren und gemeinsam zurücksetzen. Alle
 Filter-/Sortierparameter werden serverseitig geprüft. Veraltete Antworten
 laufender Browseranfragen überschreiben keine neu gewählte Ansicht.
@@ -40,20 +71,14 @@ gesetzt. Potenzielle Tabellenformeln werden mit einem führenden Apostroph als
 Text geschützt. Der Export berechnet keine klinischen Werte neu und verändert
 keine gespeicherten Antworten. Auch ein leeres Archiv liefert eine CSV-Kopfzeile.
 
-Für Sidebar, Filter und Export wurden `eras/pages/home.html`, `frontpage.css`,
-`frontpage.js`, `apps/patients/selectors.py`, `serializers.py` und `api/views.py`
-erweitert; Prüfungen stehen in `apps/patients/tests.py`, `eras/tests.py` und der
-bestehenden `eras/clinical-smoke.py`. Es wurden keine neuen Modelle, Migrationen,
-Routen oder Laufzeitabhängigkeiten eingeführt.
-
 Gespeicherte Patienten können über den Stiftknopf und **Patient löschen** entfernt
-werden. Eine zusätzliche Bestätigung nennt den gespeicherten Namen und die Anzahl
+werden. Eine zusätzliche Bestätigung nennt die Patienten-ID und die Anzahl
 aller betroffenen Fälle. Erst **Patient endgültig löschen** entfernt den Patienten
 mit seinen Fällen und Checklisten; Abbrechen erhält auch noch ungespeicherte
 Formulareingaben. Audit-Ereignisse bleiben erhalten. Eine signierte, zeitlich
 begrenzte Bestätigung verhindert Löschungen bei inzwischen geänderten Stammdaten,
-neuen Fällen oder geänderten Checklisten. Es wurde keine weitere Migration oder
-Route benötigt: Die bestehende Fall-Detailroute unterstützt jetzt auch `DELETE`.
+neuen Fällen oder geänderten Checklisten. Die Fall-Detailroute unterstützt dafür
+`DELETE`.
 
 - Geschlecht wird zentral in `Patient.sex` gespeichert und bei Neuerfassung
   verlangt. Bestandsdaten bleiben ohne automatische Zuordnung. Nachpflege und
@@ -69,49 +94,20 @@ Route benötigt: Die bestehende Fall-Detailroute unterstützt jetzt auch `DELETE
   Korrektur sichtbar. Unveränderte ungültige Altwerte werden nicht gelöscht und
   blockieren die Speicherung anderer Felder nicht. Fehlende Pflichtangaben
   dürfen weiterhin als unvollständiger Entwurf gespeichert werden.
-- Bestehende Scoregrenzen und Messwertschritte kommen weiterhin aus
-  `definition.json`; es wurden keine neuen medizinischen Obergrenzen eingeführt.
-  Messgrössen ohne festgelegten Dezimalschritt erlauben Dezimalwerte, NRS bleibt
-  ganzzahlig. Troponin und Körpertemperatur erlauben keine negativen Werte.
-  Geburtsdatum, manuelles Alter, Telefon und E-Mail sind im bestehenden Modell
-  nicht vorhanden und wurden nicht zusätzlich eingeführt. Daher gibt es auch
-  keine neue Altersberechnung oder erfundene Alters-/Plausibilitätsschwelle.
+- Scoregrenzen, Plausibilitätsgrenzen und Messwertschritte kommen aus
+  `definition.json`. Messgrössen ohne festgelegten Dezimalschritt erlauben
+  Dezimalwerte, NRS bleibt ganzzahlig. Troponin und Körpertemperatur erlauben
+  keine negativen Werte.
 - Gemeinsame Grid-Strukturen richten Labels, Eingaben und reservierte
   Fehlerzeilen aus; Checkboxen, dynamische Listen und mobile Ansichten bleiben
   im bisherigen Design.
 
-Die zusätzliche Migration `patients/0003_patient_sex.py` fügt nur das optionale
+Die Migration `patients/0003_patient_sex.py` fügt das Geschlecht als optionales
 Bestandsdatenfeld hinzu; die Pflicht bei Neuerfassung liegt in API und Admin.
-Die bestehenden Fall-Detailrouten unterstützen jetzt zusätzlich `PATCH` mit
-`baseUpdatedAt` als Schutz vor veralteten Änderungen. Es gibt keine neue Route,
-neues Modell oder neue Laufzeitabhängigkeit. Der Browser sendet nur tatsächlich
-geänderte Stammdaten. Korrekturen werden auditiert und über die bestehenden
-Revisionen an offene Checklisten weitergegeben.
-
-Geänderte bestehende Dateien für diese Optimierung:
-
-| Dateien | Zweck |
-| --- | --- |
-| `apps/patients/models.py`, `services.py`, `serializers.py`, `api/views.py`, `admin.py` | Zentrales Geschlecht, Validierung, sichere Nachpflege und Audit |
-| `eras/views.py`, `templates/eras/includes/patient_modal.html`, `static/eras/js/frontpage.js` | Bestehendes Modal, Änderungsbestätigung und Feldfehler |
-| `apps/checklist/definition.json`, `engine.py`, `apps/responses/services.py` | Gemeinsame Feldregeln, zentrale Kontext-/Scoreberechnung, technische Speicherprüfung |
-| `eras/static/eras/js/checklist.js`, `questionnaires.js`, `templates/eras/includes/checklist_header.html` | Sichtbarkeit, bearbeitbare Entwürfe und Fehleranzeige |
-| `eras/static/eras/css/frontpage.css`, `checklist.css` | Einheitliche Ausrichtung und Responsivität |
-| `apps/patients/tests.py`, `apps/checklist/tests_extensions.py`, `tests_rules.py`, `tests_procedure_types.py`, `apps/responses/tests.py`, `eras/checklist.test.cjs`, `clinical-smoke.py` | Neue Prüfungen und Anpassung vorhandener Tests an die strengere API-Validierung |
-
-Verifiziert: **98 Django-Tests (97 erfolgreich, ein optionaler OCR-Test
-übersprungen), 17 JavaScript-Tests**, Django-Systemprüfung, Migrationsprüfung,
-JavaScript-Syntaxprüfung und `collectstatic` in einem temporären Ausgabeordner.
-Die Chromium-Prüfung verwendet eine temporäre Testdatenbank und deckt Modal,
-Neuerfassung beider Geschlechter, Nachpflege, Korrektur in einem zweiten Tab,
-Abbrechen und Bestätigen der Patientenlöschung,
-Fehlerkorrektur ohne Eingabeverlust und Layout bei 1280, 768, 390 und 320 px ab.
-Zusätzlich sind Sidebar, kombinierte Filter/Sortierung, Archivansicht nach Reload,
-CSV-Download trotz leerer Suchtreffer und Wiederherstellen archivierter Fälle
-geprüft; die Startseite wurde auch bei 1024 px kontrolliert.
-Ein gesonderter Linter/Frontend-Build ist nicht konfiguriert. Fachlich unklare
-medizinische Plausibilitätsschwellen bleiben zur Freigabe offen; vorhandene
-Screeningentscheidungsregeln wurden nicht geändert.
+Die Fall-Detailroute unterstützt `PATCH` mit `baseUpdatedAt` als Schutz vor
+veralteten Änderungen. Der Browser sendet nur tatsächlich geänderte Stammdaten.
+Korrekturen werden auditiert und über die Revisionen an offene Checklisten
+weitergegeben.
 
 - Patienten und Behandlungsfälle werden in der Django-Datenbank gespeichert.
 - Die Patientenübersicht lädt/sucht Fälle über eine REST-artige JSON-API.

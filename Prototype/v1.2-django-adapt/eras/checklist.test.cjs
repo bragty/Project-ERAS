@@ -60,13 +60,13 @@ test('a section without items shows a dash instead of 0 %',()=>{
 
 test('optional male fields use central patient data and preserve hidden values',()=>{
   const run=app();
-  const fields="CHECKLIST1.find(it=>it.id==='untersuchung').fields";
-  run("STATE.answers.untersuchung_prostata='35.5'");
+  const fields="CHECKLIST1.find(it=>it.id==='anamnese-alltag').fields";
+  run("STATE.answers.anamnese_erektion='QA'");
   assert.match(run(`fieldsHTML(${fields})`), /data-male-field hidden/);
-  assert.match(run(`fieldsHTML(${fields})`), /value="35.5"/);
+  assert.match(run(`fieldsHTML(${fields})`), /value="QA"/);
   run("DERIVED.patientSex='male'");
   assert.doesNotMatch(run(`fieldsHTML(${fields})`), /data-male-field hidden/);
-  assert.match(run(`fieldsHTML(${fields})`), /Prostatavolumen \(ml\) \(optional\)/);
+  assert.match(run(`fieldsHTML(${fields})`), /Erektion \(optional\)/);
   assert.ok(run("itemIdsUsingField('stopbang_sex').includes('t1:fb-stopbang')"));
 });
 
@@ -87,9 +87,9 @@ test('numeric drafts retain invalid text and use shared ranges and steps',()=>{
   run("STATE.answers.vital_gewicht='abc'");
   assert.match(run("fieldsHTML(resolveFields(['vital_gewicht']))"),/type="text" inputmode="decimal".*value="abc"/);
   for(const [key,value,expected] of [
-    ['vital_gewicht','abc','Zahlenwert'],['vital_gewicht','-1','mindestens 0'],
+    ['vital_gewicht','abc','Zahlenwert'],['vital_gewicht','-1','mindestens 20'],['vital_gewicht','3000','höchstens 300'],
     ['vital_temp','37.05','Schritten'],['vital_spo2','101','höchstens 100'],
-    ['score_nrs','1.5','Schritten'],['vital_gewicht','300.5','']
+    ['score_nrs','1.5','Schritten'],['vital_gewicht','300','']
   ]){
     const message=run(`checklistFieldMessage({dataset:{fkey:${JSON.stringify(key)}},value:${JSON.stringify(value)},validity:{}})`);
     assert.ok(expected?message.includes(expected):message==='',`${key}: ${message}`);
@@ -120,4 +120,27 @@ test('clinical draft errors appear at the affected field',()=>{
   const run=app();
   run("ITEM_ERRORS['t1:untersuchung']={untersuchung_hals:'Wert muss mindestens 0 sein.'}");
   assert.match(run("fieldsHTML(resolveFields(['untersuchung_hals']))"), /field-error.*Wert muss mindestens 0 sein\./);
+});
+
+test('removed examination fields are gone and the kardio hint follows EF and mMRC',()=>{
+  const run=app();
+  assert.equal(run("JSON.stringify(CHECKLIST1.find(it=>it.id==='untersuchung').fields.map(f=>f.key))"),
+    JSON.stringify(['untersuchung_abdomen','untersuchung_haut','untersuchung_hals','untersuchung_bauch']));
+  const html=run("itemHTML('t1:kardio','Kardio',CHECKLIST1.find(it=>it.id==='kardio'))");
+  const flag=html.indexOf('data-rule="kardio"');
+  assert.ok(flag>html.indexOf('data-fkey="score_mmrc"'));
+  assert.ok(flag<html.indexOf('data-fkey="kardio_akut"'));
+  assert.equal(html.split('data-rule="kardio"').length,2);
+  assert.match(html,/EF \(%\) \(optional\)/);
+});
+
+test('referrals are colour coded by indication and status',()=>{
+  const run=app();
+  run("STATE.referrals={}");
+  assert.equal(run("referralClass({id:'kardio',required:true})"),'referral referral-open');
+  assert.equal(run("referralClass({id:'geriatrie',required:false})"),'referral referral-none');
+  run("STATE.referrals={kardio:{status:'Zuweisung erfolgt'},physio:{status:'Zuweisung abgeschlossen'}}");
+  assert.equal(run("referralClass({id:'kardio',required:true})"),'referral referral-progress');
+  assert.equal(run("referralClass({id:'physio',required:true})"),'referral referral-done');
+  assert.match(run("referralSummary({id:'kardio',label:'Kardiologie',required:true})"),/referral-badge">Indikation erfasst/);
 });

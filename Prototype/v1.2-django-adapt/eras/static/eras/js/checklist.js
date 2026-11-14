@@ -329,15 +329,20 @@ function customHTML(kind){
 
 function itemHTML(id, title, opts){
   opts = opts || {};
-  const { fields, flagRule, custom } = opts;
+  const { fields, flagRule, flagAfter, custom } = opts;
   const checked = !!STATE.checked[id];
   const detail = (opts.detail || []).map(d => `<li>${richText(d)}</li>`);
   if (opts.widget === "bmi") detail.push('<li>BMI: <output id="bmi">Grösse und Gewicht erfassen</output></li>');
   if (opts.scoreDescription) detail.push(`<li><p class="questionnaire-description" data-score-description="${opts.id}" aria-live="polite"></p></li>`);
   const detailHTML = detail.length ? `<div class="item-detail"><ul>${detail.join("")}</ul></div>` : "";
-  const fieldsStr = fields && fields.length ? fieldsHTML(fields) : "";
+  const flagBox = flagRule ? `<div class="flag-box" data-rule="${flagRule}"></div>` : "";
+  // "flagAfter" shows the hint directly below the field that triggers it.
+  const splitAt = flagAfter && fields ? fields.findIndex(f => f.key === flagAfter) + 1 : 0;
+  const fieldsStr = !(fields && fields.length) ? "" : splitAt
+    ? fieldsHTML(fields.slice(0, splitAt)) + flagBox + (splitAt < fields.length ? fieldsHTML(fields.slice(splitAt)) : "")
+    : fieldsHTML(fields);
   const customStr = custom ? customHTML(custom) : "";
-  const flagHTML = flagRule ? `<div class="flag-box" data-rule="${flagRule}"></div>` : "";
+  const flagHTML = splitAt ? "" : flagBox;
   const errorsHTML = itemErrorsHTML(id, fields || []);
   const noteVal = STATE.notes[id] || "";
   const noteOpen = noteVal ? "open" : "";
@@ -1120,10 +1125,9 @@ async function loadState(){
   }
   const params = new URLSearchParams(window.location.search);
   const patient = params.get("patient");
-  const caseNumber = params.get("case");
   const opDate = params.get("opdate");
-  if (!STATE.patientName && (patient || caseNumber)){
-    STATE.patientName = [patient, caseNumber ? `Fall ${caseNumber}` : ""].filter(Boolean).join(" · ");
+  if (!STATE.patientName && patient){
+    STATE.patientName = `Patienten-ID ${patient}`;
   }
   if (opDate && !STATE.opDate){
     STATE.opDate = opDate;

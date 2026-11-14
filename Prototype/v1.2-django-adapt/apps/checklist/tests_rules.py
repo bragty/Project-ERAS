@@ -73,7 +73,7 @@ class RuleTests(SimpleTestCase):
 
 class EngineRuleTests(TestCase):
     def setUp(self):
-        patient = Patient.objects.create(name="QA", patient_number="P-QA", sex="female")
+        patient = Patient.objects.create(patient_number="P-QA", sex="female")
         self.case = TreatmentCase.objects.create(patient=patient, case_number="F-QA")
         self.url = reverse("responses_api:case-state", kwargs={"case_number": self.case.case_number})
 
@@ -109,7 +109,7 @@ class EngineRuleTests(TestCase):
         self.assertEqual(derived["flaggedFields"], ["score_epworth", "score_stopbang"])
         physio = next(r for r in derived["referrals"] if r["id"] == "physio")
         self.assertTrue(physio["required"])
-        for expected in ("QA · Fall F-QA", "2026-10-30", "Beckenboden", "ViTA-Reha postoperativ"):
+        for expected in ("Patient/in: Patienten-ID P-QA", "2026-10-30", "Beckenboden", "ViTA-Reha postoperativ"):
             self.assertIn(expected, physio["text"])
         osas = next(r for r in derived["referrals"] if r["id"] == "osas")
         self.assertTrue(osas["required"])
