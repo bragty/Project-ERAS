@@ -489,8 +489,8 @@ Dropdown importiert. Nicht unterstützte Untersuchungen werden ignoriert;
 Das Beispiel ist ein Bild-PDF und benötigt Tesseract mit `deu+eng`. Unklare
 Einheiten werden gezielt erneut gelesen und bleiben bei Unsicherheit leer.
 Jeder OCR-Vorschlag muss kontrolliert und bewusst ausgewählt werden.
-Das Entnahmedatum wird aus dem gleichnamigen Kopf-Feld gelesen; Befunddatum
-und Laboreingangsdatum sind keine Messzeitpunkte.
+Messzeitpunkte werden nicht gelesen oder gespeichert. Bereits erfasste
+Laborparameter werden erst nach ausdrücklicher Bestätigung ersetzt.
 
 Details, Prüfergebnisse und Änderungsübersicht: `LAB_IMPORT_IMPLEMENTATION.md`.
 

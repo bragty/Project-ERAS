@@ -11,7 +11,6 @@ from django.conf import settings
 
 from apps.audit.services import record_event
 from apps.core.api import ApiError
-from apps.responses.services import get_state
 
 from .parser import Word, parse_positioned_words, report_identity
 
@@ -72,6 +71,11 @@ def _pdf_words(page):
 
 
 def _prepare_image(image):
+    """Return the grayscale OCR image and the upscaled color image.
+
+    The color image is kept for re-reading red (abnormal) KISIM results, which
+    turn mid-gray in grayscale and lose their decimal point.
+    """
     from PIL import ImageOps, ImageEnhance
 
     image = ImageOps.exif_transpose(image).convert("RGB")
@@ -89,10 +93,10 @@ def _prepare_image(image):
     gray = ImageOps.grayscale(image)
     gray = ImageOps.autocontrast(gray)
     gray = ImageEnhance.Sharpness(gray).enhance(1.2)
-    return gray
+    return gray, image
 
 
-def _ocr_words(image):
+def _ocr_words(image, color=None):
     import pytesseract
     from pytesseract import Output
 
@@ -103,6 +107,8 @@ def _ocr_words(image):
         rotate = int(osd.get("rotate") or 0)
         if rotate:
             image = image.rotate(-rotate, expand=True)
+            if color is not None:
+                color = color.rotate(-rotate, expand=True)
     except Exception:
         # OSD may fail on sparse pages; extraction can still continue.
         pass
@@ -135,14 +141,115 @@ def _ocr_words(image):
         height = float(row.get("height") or 0)
         words.append(Word(text, left, top, left + width, top + height, conf))
     words = _refine_unit_cells(image, words, deadline)
+    if color is not None and color.size == image.size:
+        words = _refine_red_values(color, words, deadline)
     return image, words
+
+
+def _table_header(words):
+    """Shared header detection for the cell re-reads: (height, lines, anchors) or None."""
+    from statistics import median
+    from .mapping import normalize_label
+    from .parser import _group_lines
+    if not words:
+        return None
+    height = median(w.y1-w.y0 for w in words)
+    lines = _group_lines(words, max(1, height*.7))
+    names = ("untersuchungen", "flag", "resultat", "einheit", "referenzbereich")
+    headers = []
+    for line in lines:
+        mapping = {normalize_label(w.text): w for w in line}
+        if all(name in mapping for name in names):
+            anchors = [mapping[name] for name in names]
+            if all(a.x1 < b.x0 for a, b in zip(anchors, anchors[1:])):
+                headers.append(anchors)
+    return (height, lines, headers[0]) if len(headers) == 1 else None
+
+
+def _red_pixel_count(crop):
+    from PIL import ImageChops
+    r, g, b = crop.split()
+    excess = ImageChops.subtract(r, ImageChops.lighter(g, b))
+    return excess.point(lambda v: 1 if v > 80 else 0).histogram()[1]
+
+
+def _read_value_cell(cell, deadline):
+    """One whitelisted single-line read of a result cell: (raw, confidence) or None."""
+    import pytesseract
+    try:
+        data = pytesseract.image_to_data(cell, lang="eng",
+            config="--psm 7 -c tessedit_char_whitelist=0123456789.,<>()",
+            output_type=pytesseract.Output.DICT, timeout=max(.1, deadline-time.monotonic()))
+    except RuntimeError:
+        return None
+    tokens = [(str(t).strip(), float(c)) for t, c in zip(data["text"], data["conf"]) if str(t).strip() and float(c) >= 0]
+    return (" ".join(t for t, _ in tokens), min(c for _, c in tokens)) if tokens else None
+
+
+def _refine_red_values(color, words, deadline):
+    """Re-read result cells printed in red from the color image.
+
+    KISIM prints abnormal results in red. In grayscale they become mid-gray
+    and OCR drops or invents the decimal point (8.9 -> 89). Only cells that
+    contain red ink are re-read: once from the green channel (red is dark
+    there) and once from luminance, both binarized and limited to characters
+    that can occur in a result. The value is used only if both readings agree.
+    Otherwise the cell is cleared so the result must be entered manually;
+    a red value is never taken from the unreliable full-page reading.
+    """
+    from statistics import median
+    from PIL import Image, ImageOps
+    from .mapping import IMPORTABLE_IDS, match_lab_label
+    from .parser import _text, normalize_numeric
+    found = _table_header(words)
+    if not found:
+        return words
+    height, lines, anchors = found
+    label_h, flag_h, result_h, unit_h, _ref_h = anchors
+    table_y = max(w.y1 for w in anchors)
+    result_left = (flag_h.x1 + result_h.x0) / 2
+    unit_left = unit_h.x0 - height*.2
+    refined = list(words)
+    for line in lines:
+        if min(w.cy for w in line) <= table_y:
+            continue
+        lab = match_lab_label(_text([w for w in line if label_h.x0-height <= w.x0 < flag_h.x0-height*.2]))
+        if not lab or lab["id"] not in IMPORTABLE_IDS:
+            continue
+        if time.monotonic() >= deadline:
+            break
+        cy = median(w.cy for w in line)
+        box = (max(0, int(result_left)), max(0, int(cy-height*.85)),
+               min(color.width, int(unit_left)), min(color.height, int(cy+height*.85)))
+        if box[2] <= box[0] or box[3] <= box[1]:
+            continue
+        crop = color.crop(box)
+        if _red_pixel_count(crop) < 10:
+            continue
+        readings = []
+        # Variants chosen on the supplied KISIM screenshot and PDF: neither
+        # produced a wrong number on any red cell, at most no reading.
+        for channel, scale in ((crop.getchannel("G"), 1), (ImageOps.grayscale(crop), 2)):
+            cell = ImageOps.autocontrast(channel)
+            if scale != 1:
+                cell = cell.resize((cell.width*scale, cell.height*scale), Image.LANCZOS)
+            cell = cell.point(lambda v: 0 if v < 160 else 255)
+            reading = _read_value_cell(cell, deadline)
+            if reading and normalize_numeric(reading[0])[1] is not None:
+                readings.append(reading)
+        cells = [w for w in line if result_left <= w.cx < unit_left]
+        refined = [w for w in refined if w not in cells]
+        if readings and len({normalize_numeric(raw) for raw, _ in readings}) == 1:
+            raw = readings[0][0]
+            refined.append(Word(raw, box[0], cy-height/2, box[2]-1, cy+height/2, min(c for _, c in readings)))
+    return refined
 
 
 def _refine_unit_cells(image, words, deadline):
     """Re-read only ambiguous unit cells, never infer units from expected values."""
     from statistics import median
     import pytesseract
-    from .mapping import match_lab_label, normalize_label, normalize_import_unit
+    from .mapping import IMPORTABLE_IDS, match_lab_label, normalize_label, normalize_import_unit
     from .parser import _group_lines, _text
     if not words:
         return words
@@ -165,7 +272,7 @@ def _refine_unit_cells(image, words, deadline):
             continue
         label = _text([w for w in line if label_h.x0-height <= w.x0 < flag_h.x0-height*.2])
         lab = match_lab_label(label)
-        if not lab:
+        if not lab or lab["id"] not in IMPORTABLE_IDS:
             continue
         cells = [w for w in line if unit_h.x0-height*.2 <= w.cx < ref_h.x0-height*.2]
         if normalize_import_unit(_text(cells), lab["id"], ocr=True):
@@ -218,7 +325,6 @@ def _process_pdf(data: bytes):
 
     max_pages = int(getattr(settings, "LAB_IMPORT_MAX_PAGES", 10))
     all_suggestions = []
-    all_times = []
     warnings = []
     full_text_parts = []
     used_methods = set()
@@ -240,26 +346,23 @@ def _process_pdf(data: bytes):
                 full_text_parts.append(page_text)
                 direct = parse_positioned_words(_pdf_words(page), page=page_no, width=float(page.width), method="pdf_text")
                 page_suggestions = direct["suggestions"]
-                page_times = direct["measurementTimes"]
                 page_warnings = direct["warnings"]
                 if direct["layoutRecognized"]:
                     used_methods.add("pdf_text")
                 else:
                     # If a PDF is a scan or the text layer does not preserve the
                     # table, render that page and run OCR only for this page.
-                    image = _prepare_image(_render_pdf_page(path, index))
-                    image, words = _ocr_words(image)
+                    image, color = _prepare_image(_render_pdf_page(path, index))
+                    image, words = _ocr_words(image, color)
                     ocr = parse_positioned_words(words, page=page_no, width=float(image.width), method="ocr")
                     page_suggestions = ocr["suggestions"]
-                    page_times = ocr["measurementTimes"]
                     page_warnings = ocr["warnings"]
                     if page_suggestions:
                         used_methods.add("ocr")
                     full_text_parts.append(_words_text(words))
                 all_suggestions.extend(page_suggestions)
-                all_times.extend(page_times)
                 warnings.extend(page_warnings)
-        return all_suggestions, sorted(set(all_times), reverse=True), warnings, "\n".join(full_text_parts), sorted(used_methods)
+        return all_suggestions, warnings, "\n".join(full_text_parts), sorted(used_methods)
     finally:
         try:
             path.unlink(missing_ok=True)
@@ -274,11 +377,11 @@ def _process_image(data: bytes):
         image = Image.open(io.BytesIO(data))
     except (UnidentifiedImageError, OSError) as exc:
         raise ApiError("Bilddatei kann nicht gelesen werden.", code="lab_import_invalid_image") from exc
-    image = _prepare_image(image)
-    image, words = _ocr_words(image)
+    image, color = _prepare_image(image)
+    image, words = _ocr_words(image, color)
     parsed = parse_positioned_words(words, page=1, width=float(image.width), method="ocr")
     full_text = _words_text(words)
-    return parsed["suggestions"], parsed["measurementTimes"], parsed["warnings"], full_text, ["ocr"] if parsed["suggestions"] else []
+    return parsed["suggestions"], parsed["warnings"], full_text, ["ocr"] if parsed["suggestions"] else []
 
 
 def _patient_match(identity, treatment_case):
@@ -290,7 +393,7 @@ def _patient_match(identity, treatment_case):
     if not checks:
         return {
             "status": "unverified",
-            "message": "Im Bericht wurde keine eindeutige Patienten- oder Fallkennung sicher erkannt. Bitte Zuordnung manuell prüfen.",
+            "message": "Bitte Zuordnung manuell prüfen und bestätigen.",
         }
     mismatches = [key for key, report_value, current_value in checks if str(report_value).casefold() != str(current_value).casefold()]
     if mismatches:
@@ -302,60 +405,20 @@ def _patient_match(identity, treatment_case):
     return {"status": "match", "message": "Erkannte eindeutige Kennung stimmt mit dem geöffneten Fall überein."}
 
 
-def _apply_existing_conflicts(suggestions, treatment_case):
-    _obj, state, _summary, _derived, _errors = get_state(treatment_case)
-    existing = state.get("labs") or []
-    by_label = {}
-    for index, row in enumerate(existing):
-        if not str(row.get("type") or "").strip() or not str(row.get("value") or "").strip():
-            continue
-        by_label.setdefault(row.get("type"), []).append((index, row))
-    for suggestion in suggestions:
-        matches = by_label.get(suggestion["labLabel"], [])
-        duplicate = next(
-            (
-                row
-                for _index, row in matches
-                if (row.get("importMeta") or {}).get("sourceHash") == suggestion.get("sourceHash")
-                and (row.get("importMeta") or {}).get("labId") == suggestion["labId"]
-                and (row.get("importMeta") or {}).get("measurementAt") == suggestion.get("measurementAt")
-            ),
-            None,
-        )
-        suggestion["alreadyImported"] = bool(duplicate)
-        if matches:
-            suggestion["existingConflicts"] = [
-                {
-                    "rowIndex": index,
-                    "value": str(row.get("value") or ""),
-                    "unit": str(row.get("unit") or ""),
-                    "measurementAt": (row.get("importMeta") or {}).get("measurementAt"),
-                }
-                for index, row in matches
-            ]
-            suggestion["status"] = "review"
-            suggestion["warnings"].append("Für diesen Laborparameter ist bereits ein Wert vorhanden. Übernahme muss bewusst bestätigt werden.")
-        else:
-            suggestion["existingConflicts"] = []
-
-
 def process_lab_upload(upload, treatment_case):
     data, kind = _validate_upload(upload)
     digest = hashlib.sha256(data).hexdigest()
     if kind == "pdf":
-        suggestions, times, warnings, full_text, methods = _process_pdf(data)
+        suggestions, warnings, full_text, methods = _process_pdf(data)
     else:
-        suggestions, times, warnings, full_text, methods = _process_image(data)
+        suggestions, warnings, full_text, methods = _process_image(data)
 
     identity = report_identity(full_text)
     patient_match = _patient_match(identity, treatment_case)
+    # Comparison with already recorded values happens in the preview against
+    # the current checklist, so later manual edits are taken into account.
     for suggestion in suggestions:
         suggestion["sourceHash"] = digest
-    _apply_existing_conflicts(suggestions, treatment_case)
-    for suggestion in suggestions:
-        if suggestion.get("alreadyImported"):
-            suggestion["status"] = "review"
-            suggestion["warnings"].append("Dieser Wert aus demselben Bericht wurde bereits übernommen.")
 
     if not suggestions:
         warnings.append("Keine unterstützten Laborwerte konnten sicher erkannt werden. Bericht bitte manuell erfassen oder Layout-Konfiguration ergänzen.")
@@ -368,7 +431,6 @@ def process_lab_upload(upload, treatment_case):
         metadata={
             "fileType": kind,
             "suggestionCount": len(suggestions),
-            "measurementTimeCount": len(times),
             "methods": methods,
             "patientMatch": patient_match["status"],
         },
@@ -378,7 +440,6 @@ def process_lab_upload(upload, treatment_case):
         "sourceHash": digest,
         "fileName": Path(upload.name or "Laborbericht").name,
         "fileType": kind,
-        "measurementTimes": times,
         "patientMatch": patient_match,
         "blocked": patient_match["status"] == "mismatch",
         "suggestions": suggestions,

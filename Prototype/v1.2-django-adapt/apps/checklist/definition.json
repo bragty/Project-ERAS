@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "fields": {
     "amb_ileum_uk_entfernung": {
       "label": "Entfernung UK (Datum)",
@@ -1232,7 +1232,6 @@
       "id": "t1:laborwerte",
       "title": "Laborwerte erfassen",
       "detail": [
-        "Hämatogramm gross; Quick/INR; Ferritin und Transferrinsättigung; Kreatinin, Natrium, Kalium, CRP; Troponin T und BNP.",
         "Laborberichte können als PDF oder Bild importiert und vor der Übernahme kontrolliert werden. Die manuelle Erfassung bleibt weiterhin möglich."
       ],
       "custom": "labs"

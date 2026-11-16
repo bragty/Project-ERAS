@@ -4,7 +4,7 @@ from copy import deepcopy
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
-from .lab_import.mapping import CATALOG_BY_LABEL
+from .lab_import.mapping import CATALOG_BY_LABEL, migrate_lab_rows
 from .lab_import.parser import normalize_numeric
 from .rules import FLAG_RULES, active_flags, as_number, field_required, referrals, cardiac_assessment, bowel_guidance
 from .schema import (
@@ -86,6 +86,9 @@ def migrate_state(state):
         ecog = answers.get("score_ecog")
         if isinstance(ecog, str) and len(ecog) > 4 and ecog[0] in "012345" and ecog[1:4] == " = ":
             answers["score_ecog"] = ecog[0]
+    if version < 5:
+        # Lab labels now follow the exact KISIM names (e.g. Hb -> Hämoglobin).
+        state["labs"] = migrate_lab_rows(state.get("labs") or [])
     state["schemaVersion"] = CURRENT_SCHEMA_VERSION
     return state
 
@@ -206,6 +209,7 @@ def draft_errors(state, treatment_case, *, validate_hidden=False):
                     raise ValueError
             except (TypeError, ValueError):
                 errors.setdefault("referrals", {})[referral_id] = "Bitte ein gültiges Datum eingeben."
+    seen_labels = set()
     for index, row in enumerate(state.get("labs") or []):
         if not isinstance(row, dict):
             errors.setdefault("t1:laborwerte", {})[f"lab:{index}"] = "Ungültige Laborzeile."
@@ -213,6 +217,10 @@ def draft_errors(state, treatment_case, *, validate_hidden=False):
         label, value = row.get("type"), row.get("value")
         if (label is not None and not isinstance(label, str)) or (label and label not in CATALOG_BY_LABEL):
             errors.setdefault("t1:laborwerte", {})[f"lab:{index}:type"] = "Unbekannter Laborparameter."
+        elif label and label != "Anderer Wert":
+            if label in seen_labels:
+                errors.setdefault("t1:laborwerte", {})[f"lab:{index}:type"] = f"{label} ist bereits erfasst."
+            seen_labels.add(label)
         if value not in (None, "") and label != "Anderer Wert":
             _operator, numeric = normalize_numeric(value)
             if numeric is None or as_number(numeric) is None or as_number(numeric) < 0:
@@ -242,13 +250,17 @@ def validate_item(item_id, state, effective_answers=None):
             errors["labs"] = "Jede Laborzeile benötigt Laborwert, Wert und Einheit."
         else:
             row_errors = []
+            seen_labels = set()
             for index, row in enumerate(nonempty):
                 label = str(row.get("type") or "").strip()
                 value = str(row.get("value") or "").strip()
                 if label not in CATALOG_BY_LABEL:
                     row_errors.append(f"Zeile {index + 1}: unbekannter Laborparameter.")
+                elif label != "Anderer Wert" and label in seen_labels:
+                    row_errors.append(f"Zeile {index + 1}: {label} ist bereits erfasst.")
                 elif label != "Anderer Wert" and normalize_numeric(value)[1] is None:
                     row_errors.append(f"Zeile {index + 1}: numerischer Wert erwartet (optional mit < oder >).")
+                seen_labels.add(label)
             if row_errors:
                 errors["labs"] = " ".join(row_errors)
     return errors

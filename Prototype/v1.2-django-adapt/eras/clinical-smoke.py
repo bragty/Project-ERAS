@@ -40,7 +40,7 @@ def main():
         for suffix in ('A','B'):
             archived=TreatmentCase.objects.create(patient=Patient.objects.create(patient_number='P-ARCHIVED-'+suffix,sex='female'),case_number='ARCHIVE-QA-'+suffix,archived=True,op_date='2026-10-03')
             ChecklistState.objects.create(treatment_case=archived,complete=True,progress_total=100,
-                                          state={'notes':{'t1:diagnosen':'CSV QA;\nNotiz'},'labs':[{'type':'Hb','value':'124','unit':'g/l'}]})
+                                          state={'notes':{'t1:diagnosen':'CSV QA;\nNotiz'},'labs':[{'type':'Hämoglobin','value':'124','unit':'g/l'}]})
         with socket.socket() as sock:
             sock.bind(('127.0.0.1', 0))
             port = sock.getsockname()[1]
@@ -251,7 +251,7 @@ def main():
                     expect(page.locator('#opdate')).to_have_value('31.02.2026')
                     page.locator('#opdate').fill('2026-11-10')
                     expect(page.locator('#opdateError')).to_be_empty()
-                    page.locator('[data-lab-key="type"]').first.select_option('Hb')
+                    page.locator('[data-lab-key="type"]').first.select_option('Hämoglobin')
                     lab=page.locator('[data-lab-key="value"]').first
                     lab.fill('-1')
                     page.locator('[data-lab-key="unit"]').first.fill('g/l')

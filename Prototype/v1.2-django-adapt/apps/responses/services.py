@@ -57,6 +57,7 @@ def save_state(treatment_case, raw_state, base_revision=None):
     server state into its local edits and retries, so concurrent edits on
     different fields do not overwrite each other.
     """
+    from apps.checklist.lab_import.mapping import migrate_lab_rows
     from apps.checklist.lab_import.validation import validate_imported_labs
     for key in ("answers", "checked", "notes", "referrals", "openBlocks"):
         if key in raw_state and not isinstance(raw_state[key], dict):
@@ -64,7 +65,14 @@ def save_state(treatment_case, raw_state, base_revision=None):
     for key in ("labs", "suchtmittel"):
         if key in raw_state and not isinstance(raw_state[key], list):
             raise ApiError("Ungültige Listenstruktur.", status=422, code="validation_error", fields={key: "Liste erwartet."})
+    # A page opened before the KISIM renaming may still send old labels.
+    if isinstance(raw_state.get("labs"), list):
+        raw_state["labs"] = migrate_lab_rows(raw_state["labs"])
     validate_imported_labs(raw_state.get("labs") or [])
+    # Lab import no longer records sample times; drop them from older rows too.
+    for row in raw_state.get("labs") or []:
+        if isinstance(row, dict) and isinstance(row.get("importMeta"), dict):
+            row["importMeta"].pop("measurementAt", None)
     state_obj, _ = ChecklistState.objects.select_for_update().get_or_create(
         treatment_case=treatment_case,
         defaults={"state": default_state(treatment_case)},
@@ -154,7 +162,7 @@ def save_state(treatment_case, raw_state, base_revision=None):
             meta = row.get("importMeta") if isinstance(row, dict) else None
             if not isinstance(meta, dict) or not meta.get("sourceHash") or not meta.get("labId"):
                 continue
-            key = (str(meta.get("sourceHash")), str(meta.get("labId")), str(meta.get("measurementAt") or ""))
+            key = (str(meta.get("sourceHash")), str(meta.get("labId")))
             keys.add(key)
             details[key] = meta
         return keys, details
@@ -172,7 +180,6 @@ def save_state(treatment_case, raw_state, base_revision=None):
                 "count": len(added_imports),
                 "sourceHashes": sorted({key[0][:16] for key in added_imports}),
                 "labIds": sorted({key[1] for key in added_imports}),
-                "measurementTimes": sorted({key[2] for key in added_imports if key[2]}),
                 "revision": state_obj.revision,
             },
         )

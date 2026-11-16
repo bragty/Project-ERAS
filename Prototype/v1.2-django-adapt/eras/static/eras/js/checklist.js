@@ -26,14 +26,22 @@ const PHASES = CHECKLIST_DEFINITION.phases.map(ph => ({
 }));
 
 /* ============================= STATE ============================= */
+// Exact KISIM names; same order and ids as LAB_CATALOG in apps/checklist/lab_import/mapping.py.
 const LAB_OPTIONS = [
-  "Hb", "Leukozyten", "Thrombozyten", "Quick / INR", "Ferritin", "Transferrinsättigung",
-  "Kreatinin", "Natrium", "Kalium", "CRP", "Troponin T", "BNP", "Albumin", "Anderer Wert"
+  "Hämoglobin", "Hämatokrit", "Thrombozyten", "Leukozyten", "Prothrombinzeit (Quick)", "INR", "HbA1c",
+  "Kreatinin", "eGFR", "Kalium", "Natrium", "Troponin-T high sensitive", "NT-proBNP",
+  "ASAT (GOT)", "ALAT (GPT)", "Gamma-GT (GGT)", "Alkalische Phosphatase", "CRP",
+  "Transferrinsättigung", "Ferritin", "Vitamin B12", "Folsäure", "TSH", "Anderer Wert"
 ];
+// Former options: still shown in stored rows, no longer selectable.
+const LAB_LEGACY_OPTIONS = ["Quick / INR", "BNP", "Albumin"];
 const LAB_ID_BY_LABEL = {
-  "Hb":"hb","Leukozyten":"leukozyten","Thrombozyten":"thrombozyten","Quick / INR":"quick_inr",
-  "Ferritin":"ferritin","Transferrinsättigung":"transferrinsaettigung","Kreatinin":"kreatinin","Natrium":"natrium",
-  "Kalium":"kalium","CRP":"crp","Troponin T":"troponin_t","BNP":"bnp","Albumin":"albumin","Anderer Wert":"other"
+  "Hämoglobin":"hb","Hämatokrit":"haematokrit","Thrombozyten":"thrombozyten","Leukozyten":"leukozyten",
+  "Prothrombinzeit (Quick)":"quick","INR":"inr","HbA1c":"hba1c","Kreatinin":"kreatinin","eGFR":"egfr",
+  "Kalium":"kalium","Natrium":"natrium","Troponin-T high sensitive":"troponin_t","NT-proBNP":"nt_probnp",
+  "ASAT (GOT)":"asat","ALAT (GPT)":"alat","Gamma-GT (GGT)":"ggt","Alkalische Phosphatase":"ap","CRP":"crp",
+  "Transferrinsättigung":"transferrinsaettigung","Ferritin":"ferritin","Vitamin B12":"vitamin_b12",
+  "Folsäure":"folsaeure","TSH":"tsh","Anderer Wert":"other"
 };
 const LAB_IMPORT_OPTIONS = LAB_OPTIONS.filter(label => label !== "Anderer Wert");
 let LAB_IMPORT_PREVIEW = null;
@@ -135,22 +143,67 @@ function optionsHTML(options, val){
   ).join("");
 }
 
+// Each lab parameter may appear only once; "Anderer Wert" stays repeatable.
+function labTypeTaken(type, idx){
+  return !!type && type!=='Anderer Wert' && (STATE.labs||[]).some((row,i)=>i!==idx && row.type===type);
+}
+
+function labOptionsHTML(idx, val){
+  const legacy = LAB_LEGACY_OPTIONS.includes(val) ? [`<option value="${esc(val)}" selected>${esc(val)} (nicht mehr auswählbar)</option>`] : [];
+  return ['<option value="">–</option>'].concat(legacy,
+    LAB_OPTIONS.map(o => {
+      const taken = o!==val && labTypeTaken(o, idx);
+      return `<option value="${esc(o)}" ${val===o?"selected":""} ${taken?"disabled":""}>${esc(o)}${taken?" (bereits erfasst)":""}</option>`;
+    })
+  ).join("");
+}
+
+function setLabField(field){
+  const idx = parseInt(field.dataset.labIdx, 10);
+  const key = field.dataset.labKey;
+  if(key==='type' && labTypeTaken(field.value, idx)){
+    alert(`${field.value} ist bereits erfasst. Bitte den vorhandenen Wert anpassen.`);
+    field.value = STATE.labs[idx].type || '';
+    return false;
+  }
+  STATE.labs[idx][key] = field.value;
+  return true;
+}
+
 function currentCaseNumber(){
   return new URLSearchParams(window.location.search).get('case') || '';
 }
 
-function formatMeasurementTime(value){
-  if(!value) return 'Messzeitpunkt nicht erkannt';
-  const date = new Date(value);
-  return Number.isFinite(date.getTime()) ? date.toLocaleString('de-CH',{dateStyle:'short',timeStyle:'short'}) : value;
+// Comparable form of a lab value ("<5,2" -> "<5.2") and unit; null if not numeric.
+function labValueKey(value){
+  const match = String(value??'').replace(/\s+/g,'').replace(',','.').match(/^(<=|>=|<|>)?([+-]?(?:\d+(?:\.\d+)?|\.\d+))$/);
+  return match ? `${match[1]||''}${Number(match[2])}` : null;
+}
+function labUnitKey(unit){
+  return String(unit||'').replace(/\s+/g,'').replace(/\/L$/,'/l');
+}
+function existingLabRow(label){
+  return (STATE.labs||[]).find(row=>row.type===label && String(row.value||'').trim());
+}
+// A suggestion equal to the recorded value needs no decision and is only listed.
+function labImportIdentical(item){
+  const row = existingLabRow(item.labLabel);
+  if(!row) return false;
+  const recorded = labValueKey(row.value);
+  return recorded!==null && recorded===labValueKey(`${item.comparisonOperator||''}${item.normalizedValue||''}`)
+    && labUnitKey(row.unit)===labUnitKey(item.normalizedUnit);
 }
 
 function labImportPreviewHTML(){
   if(!LAB_IMPORT_PREVIEW) return '';
   const patient = LAB_IMPORT_PREVIEW.patientMatch || {status:'unverified',message:'Patientenzuordnung nicht geprüft.'};
-  const times = LAB_IMPORT_PREVIEW.measurementTimes || [];
-  const selectedTime = LAB_IMPORT_PREVIEW.selectedTime ?? times[0] ?? '';
-  const suggestions = (LAB_IMPORT_PREVIEW.suggestions || []).filter(item => !selectedTime || item.measurementAt === selectedTime);
+  const suggestions = LAB_IMPORT_PREVIEW.suggestions || [];
+  const entries = suggestions.map((item,index)=>({item, index, identical:labImportIdentical(item)}));
+  const pending = entries.filter(entry=>!entry.identical);
+  const known = entries.filter(entry=>entry.identical);
+  const knownHTML = known.length ? `<details class="lab-import-known"><summary>${known.length} ${known.length===1?'Wert ist':'Werte sind'} bereits identisch erfasst</summary><ul>${known.map(({item})=>`<li><span>${esc(item.labLabel)}</span> ${esc(`${item.comparisonOperator||''}${item.normalizedValue||''}`)} ${esc(item.normalizedUnit||'')}</li>`).join('')}</ul></details>` : '';
+  const emptyHTML = suggestions.length ? '<p class="lab-import-empty">Alle erkannten Werte sind bereits identisch erfasst.</p>' : '<p class="lab-import-empty">Es wurden keine unterstützten Werte erkannt.</p>';
+  // Without selectable values there is nothing to assign or confirm.
   const patientClass = patient.status === 'match' ? 'ok' : patient.status === 'mismatch' ? 'error' : 'warning';
   const globalWarnings = (LAB_IMPORT_PREVIEW.warnings || []).map(w=>`<li>${esc(w)}</li>`).join('');
   return `<div class="lab-import-preview" data-lab-import-preview>
@@ -158,36 +211,35 @@ function labImportPreviewHTML(){
       <strong>Importvorschau</strong>
       <span>${esc(LAB_IMPORT_PREVIEW.fileName || '')}</span>
     </div>
-    <div class="lab-import-patient ${patientClass}">${esc(patient.message || '')}</div>
-    ${patient.status==='unverified' ? `<label class="lab-import-confirm"><input type="checkbox" data-lab-patient-confirm> Patient/Fall wurde anhand des geöffneten Falls manuell kontrolliert.</label>` : ''}
-    ${times.length>1 ? `<label class="field lab-import-time"><span>Messzeitpunkt</span><select data-lab-import-time>${times.map(t=>`<option value="${esc(t)}" ${t===selectedTime?'selected':''}>${esc(formatMeasurementTime(t))}</option>`).join('')}</select></label>` : ''}
+    ${patient.status==='unverified' && !pending.length ? '' : `<div class="lab-import-patient ${patientClass}">${esc(patient.message || '')}</div>`}
+    ${patient.status==='unverified' && pending.length ? `<label class="lab-import-confirm"><input type="checkbox" data-lab-patient-confirm> Patient/Fall wurde anhand des geöffneten Falls manuell kontrolliert.</label>` : ''}
     ${globalWarnings ? `<ul class="lab-import-warnings">${globalWarnings}</ul>` : ''}
     <div class="lab-import-results">
-      ${suggestions.length ? suggestions.map((item,index)=>{
-        const sourceIndex = (LAB_IMPORT_PREVIEW.suggestions||[]).indexOf(item);
-        const hasConflict = (item.existingConflicts || []).length>0;
-        const disabled = !!item.alreadyImported || !!LAB_IMPORT_PREVIEW.blocked;
-        const checked = item.status==='ready' && !hasConflict && !disabled ? 'checked' : '';
+      ${pending.length ? pending.map(({item, index})=>{
+        const sourceIndex = index;
+        const existing = existingLabRow(item.labLabel);
+        const disabled = !!LAB_IMPORT_PREVIEW.blocked;
+        const checked = item.status==='ready' && !existing && !disabled ? 'checked' : '';
         const warnings = (item.warnings||[]).map(w=>`<li>${esc(w)}</li>`).join('');
-        const conflict = hasConflict ? `<div class="lab-import-conflict">Vorhanden: ${(item.existingConflicts||[]).map(c=>`${esc(c.value)} ${esc(c.unit)}`).join(', ')}. Bei Auswahl wird der erste vorhandene Wert dieses Parameters ersetzt.</div>` : '';
-        const key = `${item.labId}|${item.measurementAt||''}|${item.sourcePage}|${sourceIndex}`;
+        const conflict = existing ? `<div class="lab-import-conflict">Bereits erfasst: ${esc(String(existing.value||'').trim())} ${esc(String(existing.unit||'').trim())}. Bei Auswahl wird dieser Wert durch den Berichtswert ersetzt.</div>` : '';
+        const key = `${item.labId}|${item.sourcePage}|${sourceIndex}`;
         return `<article class="lab-import-result ${item.status==='review'?'review':''}">
           <label class="lab-import-select"><input type="checkbox" data-lab-import-select="${esc(key)}" data-lab-import-index="${sourceIndex}" ${checked} ${disabled?'disabled':''}> Übernehmen</label>
           <div class="lab-import-grid">
             <label><span>Laborparameter</span><select disabled aria-label="Erkannter Laborparameter" data-lab-preview-index="${sourceIndex}" data-lab-preview-field="labLabel">${optionsHTML(LAB_IMPORT_OPTIONS,item.labLabel)}</select><small>Erkannt: ${esc(item.originalLabel||'')}</small></label>
             <label><span>Wert</span><div class="lab-import-value"><select data-lab-preview-index="${sourceIndex}" data-lab-preview-field="comparisonOperator">${['','<','>','<=','>='].map(op=>`<option value="${esc(op)}" ${op===(item.comparisonOperator||'')?'selected':''}>${esc(op||'=')}</option>`).join('')}</select><input type="text" data-lab-preview-index="${sourceIndex}" data-lab-preview-field="normalizedValue" value="${esc(item.normalizedValue||'')}"></div><small>Original: ${esc(item.originalValue||'')}</small></label>
             <label><span>Einheit</span><input type="text" data-lab-preview-index="${sourceIndex}" data-lab-preview-field="normalizedUnit" value="${esc(item.normalizedUnit||'')}"><small>Original: ${esc(item.originalUnit||'')}</small></label>
-            <label><span>Messzeitpunkt</span><input type="datetime-local" data-lab-preview-index="${sourceIndex}" data-lab-preview-field="measurementAt" value="${esc(item.measurementAt||'')}"><small>Seite ${esc(item.sourcePage)}</small></label>
           </div>
           ${conflict}
           ${warnings ? `<ul class="lab-import-warnings">${warnings}</ul>` : ''}
           <details class="lab-import-source"><summary>Fundstelle anzeigen</summary><code>${esc(item.sourceExcerpt||'Keine Fundstelle verfügbar')}</code></details>
         </article>`;
-      }).join('') : '<p class="lab-import-empty">Für diesen Messzeitpunkt wurden keine unterstützten Werte erkannt.</p>'}
+      }).join('') : emptyHTML}
+      ${knownHTML}
     </div>
     <div class="lab-import-actions">
-      <button type="button" class="btn" data-lab-import-cancel>Abbrechen</button>
-      <button type="button" class="btn primary" data-lab-import-apply ${LAB_IMPORT_PREVIEW.blocked?'disabled':''}>Werte übernehmen</button>
+      ${pending.length ? `<button type="button" class="btn" data-lab-import-cancel>Abbrechen</button>
+      <button type="button" class="btn primary" data-lab-import-apply ${LAB_IMPORT_PREVIEW.blocked?'disabled':''}>Werte übernehmen</button>` : '<button type="button" class="btn" data-lab-import-cancel>Schliessen</button>'}
     </div>
   </div>`;
 }
@@ -210,7 +262,7 @@ function labRowsHTML(){
   STATE.labs = rows;
   return `${labImportHTML()}<div class="dynamic-list" data-dynamic="labs">
     ${rows.map((row, idx) => `<div class="dynamic-row">
-      <label class="field"><span>Laborwert</span><select data-lab-idx="${idx}" data-lab-key="type">${optionsHTML(LAB_OPTIONS, row.type)}</select></label>
+      <label class="field"><span>Laborwert</span><select data-lab-idx="${idx}" data-lab-key="type">${labOptionsHTML(idx, row.type)}</select></label>
       <label class="field"><span>Wert</span><input type="text" data-lab-idx="${idx}" data-lab-key="value" value="${esc(row.value||"")}"></label>
       <label class="field"><span>Einheit</span><input type="text" data-lab-idx="${idx}" data-lab-key="unit" value="${esc(row.unit||"")}" placeholder="z.B. g/L"></label>
       <button type="button" class="icon-btn" data-remove-lab="${idx}" aria-label="Laborwert entfernen">×</button>
@@ -233,7 +285,6 @@ async function processLabImport(file){
     const body = new FormData();
     body.append('file', file);
     const payload = await window.erasApi.fetch(`/api/cases/${encodeURIComponent(caseNumber)}/labs/import/`, {method:'POST', body});
-    payload.selectedTime = (payload.measurementTimes || [])[0] || '';
     LAB_IMPORT_PREVIEW = payload;
   }catch(err){
     LAB_IMPORT_PREVIEW = null;
@@ -256,7 +307,7 @@ function applyLabImport(){
     }
   }
   const checkedIndexes = new Set([...document.querySelectorAll('[data-lab-import-index]:checked')].map(el=>Number(el.dataset.labImportIndex)));
-  const selected = (LAB_IMPORT_PREVIEW.suggestions||[]).filter((item,index)=>checkedIndexes.has(index) && !item.alreadyImported);
+  const selected = (LAB_IMPORT_PREVIEW.suggestions||[]).filter((item,index)=>checkedIndexes.has(index) && !labImportIdentical(item));
   if(!selected.length){ alert('Keine Werte zur Übernahme ausgewählt.'); return; }
   const invalid = selected.find(item=>!LAB_IMPORT_OPTIONS.includes(item.labLabel) || LAB_ID_BY_LABEL[item.labLabel]!==item.labId || !/^[+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+)$/.test(String(item.normalizedValue??'').trim()) || !['','<','>','<=','>='].includes(item.comparisonOperator||'') || !String(item.normalizedUnit||'').trim());
   if(invalid){
@@ -269,15 +320,17 @@ function applyLabImport(){
     return;
   }
   // A manual edit made while the import was running also needs confirmation.
-  const conflicts = selected.filter(item=>STATE.labs.some(row=>row.type===item.labLabel && String(row.value||'').trim()));
-  if(conflicts.length && !confirm('Vorhandene Werte ersetzen: '+conflicts.map(item=>item.labLabel).join(', ')+'?')) return;
+  const conflicts = selected.map(item=>({item, row:STATE.labs.find(row=>row.type===item.labLabel && String(row.value||'').trim())})).filter(c=>c.row);
+  if(conflicts.length){
+    const lines = conflicts.map(({item,row})=>`${item.labLabel}: ${String(row.value||'').trim()} ${String(row.unit||'').trim()} → ${item.comparisonOperator||''}${item.normalizedValue||''} ${item.normalizedUnit||''}`.trim());
+    if(!confirm('Folgende Laborwerte sind bereits erfasst:\n'+lines.join('\n')+'\n\nVorhandene Werte ersetzen?')) return;
+  }
 
   selected.forEach(item=>{
     const value = `${item.comparisonOperator||''}${item.normalizedValue||''}`;
     const meta = {
       sourceHash: item.sourceHash,
       labId: item.labId,
-      measurementAt: item.measurementAt || null,
       sourcePage: item.sourcePage,
       extractionMethod: item.extractionMethod,
       originalLabel: item.originalLabel,
@@ -286,12 +339,6 @@ function applyLabImport(){
       templateId: item.templateId,
       confirmedAt: new Date().toISOString()
     };
-    const exactDuplicate = STATE.labs.find(row=>{
-      const existing = row.importMeta || {};
-      return existing.sourceHash===meta.sourceHash && existing.labId===meta.labId && existing.measurementAt===meta.measurementAt;
-    });
-    if(exactDuplicate) return;
-
     const conflictIndex = STATE.labs.findIndex(row=>row.type===item.labLabel && String(row.value||'').trim());
     const target = conflictIndex>=0 ? conflictIndex : STATE.labs.findIndex(row=>!row.type && !String(row.value||'').trim() && !String(row.unit||'').trim());
     const row = {type:item.labLabel, value, unit:item.normalizedUnit||item.originalUnit||'', importMeta:meta};
@@ -613,8 +660,7 @@ function attachHandlers(){
     }
     const lab = e.target.closest('[data-lab-idx]');
     if (lab){
-      const idx = parseInt(lab.dataset.labIdx, 10);
-      STATE.labs[idx][lab.dataset.labKey] = lab.value;
+      if(!setLabField(lab)) return;
       invalidateConfirmations(['t1:laborwerte']);
       scheduleSave();
       return;
@@ -637,12 +683,6 @@ function attachHandlers(){
   document.body.addEventListener('change', (e) => {
     const fileInput = e.target.closest('[data-lab-file]');
     if(fileInput){ processLabImport(fileInput.files?.[0]); return; }
-    const importTime = e.target.closest('[data-lab-import-time]');
-    if(importTime && LAB_IMPORT_PREVIEW){
-      LAB_IMPORT_PREVIEW.selectedTime = importTime.value;
-      renderChecklist1();
-      return;
-    }
     const previewField = e.target.closest('[data-lab-preview-field]');
     if (previewField && LAB_IMPORT_PREVIEW){
       const item = LAB_IMPORT_PREVIEW.suggestions?.[Number(previewField.dataset.labPreviewIndex)];
@@ -660,9 +700,10 @@ function attachHandlers(){
     }
     const lab = e.target.closest('select[data-lab-idx]');
     if (lab){
-      const idx = parseInt(lab.dataset.labIdx, 10);
-      STATE.labs[idx][lab.dataset.labKey] = lab.value;
+      if(!setLabField(lab)) return;
       scheduleSave();
+      // Refresh the other rows so the chosen parameter is no longer selectable.
+      if(lab.dataset.labKey==='type'){ renderChecklist1(); renderDerived(); }
     }
   });
 

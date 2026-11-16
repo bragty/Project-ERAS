@@ -1,18 +1,15 @@
 """Strict parser for the supplied KISIM single-result report (Beispiel Labor).
 
 Coordinates are normalized to page width. Only the five verified table headers
-are accepted. Dates in the report header are NOT interpreted as result columns.
+are accepted. Sample dates/times are intentionally not read or stored.
 """
 from __future__ import annotations
 from dataclasses import dataclass
-from datetime import datetime
 from statistics import median
 import re
-from .mapping import match_lab_label, normalize_label, normalize_import_unit
+from .mapping import IMPORTABLE_IDS, match_lab_label, normalize_label, normalize_import_unit
 
 TEMPLATE_ID = "kisim-single-result-v1"
-DATE_RE = re.compile(r"(?<!\d)(\d{2}\.\d{2}\.\d{4})(?!\d)")
-TIME_RE = re.compile(r"(?<!\d)(\d{1,2}:\d{2})(?::\d{2})?(?!\d)")
 VALUE_RE = re.compile(r"^\s*(?P<op>[<>]=?)?\s*(?P<num>[+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+))\s*(?P<flag>\*)?\s*$")
 
 @dataclass(frozen=True)
@@ -39,6 +36,8 @@ def normalize_numeric(raw: str):
     # KISIM marks abnormal values next to the number. OCR may read that marker
     # as *, °, quotes or guillemets; these suffixes are not part of the value.
     raw = re.sub(r"[\s*°\"'»«]+$", "", raw).strip()
+    # KISIM appends footnote references to some results, e.g. "92 (1)".
+    raw = re.sub(r"\s*\(\d{1,2}\)$", "", raw).strip()
     match = VALUE_RE.match(raw)
     if not match:
         return None, None
@@ -65,26 +64,8 @@ def _text(words):
     return " ".join(w.text.strip() for w in words).strip()
 
 
-def _sample_time(lines, table_y):
-    found = []
-    for line in lines:
-        labels = [w for w in line if normalize_label(w.text) == "entnahmedatum" and w.cy < table_y]
-        for label in labels:
-            # The supplied form has metadata in two halves. Never take the
-            # Befunddatum/Letzte Änderung or Laboreingangsdatum as sample time.
-            right = [w for w in line if label.x1 < w.x0 < 470]
-            text = _text(right)
-            dates, times = DATE_RE.findall(text), TIME_RE.findall(text)
-            if len(dates) == 1 and len(times) == 1:
-                try:
-                    found.append(datetime.strptime(dates[0]+" "+times[0], "%d.%m.%Y %H:%M").isoformat(timespec="minutes"))
-                except ValueError:
-                    pass
-    return found[0] if len(found) == 1 else None
-
-
 def parse_positioned_words(words: list[Word], *, page: int, width: float, method: str):
-    empty = {"suggestions": [], "measurementTimes": [], "warnings": [],
+    empty = {"suggestions": [], "warnings": [],
              "layoutRecognized": False, "templateId": TEMPLATE_ID}
     if width <= 0 or not words:
         empty["warnings"] = [f"Seite {page}: keine lesbare KISIM-Tabelle erkannt."]
@@ -107,8 +88,7 @@ def parse_positioned_words(words: list[Word], *, page: int, width: float, method
         return empty
     label_h, flag_h, result_h, unit_h, reference_h = headers[0]
     table_y = max(w.y1 for w in headers[0])
-    sample_time = _sample_time(lines, table_y)
-    warnings = [] if sample_time else ["Entnahmedatum/-zeit nicht eindeutig erkannt; bitte manuell prüfen."]
+    warnings = []
     # Boundaries are anchored to the actual headings, not hard-coded row numbers.
     label_right = flag_h.x0 - height*.2
     result_left = (flag_h.x1 + result_h.x0)/2
@@ -123,7 +103,7 @@ def parse_positioned_words(words: list[Word], *, page: int, width: float, method
         label = _text(label_words)
         lab = match_lab_label(label)
         result_words = [w for w in line if result_left <= w.cx < unit_left]
-        if not lab or lab["id"] == "other":
+        if not lab or lab["id"] not in IMPORTABLE_IDS:
             if label and result_words:
                 ignored += 1
             continue
@@ -138,8 +118,6 @@ def parse_positioned_words(words: list[Word], *, page: int, width: float, method
             item_warnings.append("Resultat fehlt oder ist nicht eindeutig lesbar; manuell prüfen.")
         if not unit:
             item_warnings.append("Einheit fehlt oder passt nicht eindeutig zum Laborparameter; manuell prüfen.")
-        if not sample_time:
-            item_warnings.append("Entnahmedatum/-zeit manuell prüfen.")
         confidence = min((w.confidence for w in label_words+result_words+unit_words), default=0)
         if method == "ocr":
             # Every OCR proposal requires conscious selection, even high scores.
@@ -150,15 +128,14 @@ def parse_positioned_words(words: list[Word], *, page: int, width: float, method
             "labId": lab["id"], "labLabel": lab["label"], "originalLabel": label,
             "originalValue": raw_value, "normalizedValue": value or "",
             "comparisonOperator": operator or "", "originalUnit": raw_unit,
-            "normalizedUnit": unit, "measurementAt": sample_time, "sourcePage": page,
+            "normalizedUnit": unit, "sourcePage": page,
             "sourceExcerpt": _text(line), "extractionMethod": method,
             "confidence": round(confidence, 1), "status": "review" if item_warnings else "ready",
             "warnings": item_warnings, "templateId": TEMPLATE_ID,
         })
     if ignored:
         warnings.append(f"{ignored} Untersuchungen ausserhalb der auswählbaren Laborwerte wurden ignoriert.")
-    return {"suggestions": suggestions, "measurementTimes": [sample_time] if sample_time else [],
-            "warnings": warnings, "layoutRecognized": True, "templateId": TEMPLATE_ID}
+    return {"suggestions": suggestions, "warnings": warnings, "layoutRecognized": True, "templateId": TEMPLATE_ID}
 
 
 def report_identity(text: str):

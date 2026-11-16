@@ -10,8 +10,12 @@ Es werden keine Ergebnisse, Befundnummern oder Daten des Beispiels im Produktivp
 
 Das Layout wird anhand aller fünf Spaltenüberschriften und ihrer Reihenfolge erkannt.
 Koordinaten werden relativ zur Seitenbreite ausgewertet; Datenzeilen dürfen sich verschieben.
-Nur das explizite Feld Entnahmedatum liefert den Messzeitpunkt. Fehlt es oder ist es
-nicht eindeutig, bleibt dieser offen. Befunddatum und Eingangsdatum sind kein Ersatz.
+Messzeitpunkte (Entnahme-, Befund- oder Eingangsdatum) werden weder gelesen noch gespeichert.
+Die Vorschau vergleicht jeden erkannten Wert mit der aktuellen Checkliste (nach Inhalt,
+nicht nach Datei): Identische Werte (gleicher Wert und gleiche Einheit) erscheinen nur in
+der zusammengefassten Liste «bereits identisch erfasst». Weicht der erfasste Wert ab, wird
+er angezeigt und der Berichtswert bleibt auswählbar; beim Übernehmen muss das Ersetzen
+(alter → neuer Wert) ausdrücklich bestätigt werden.
 Verlaufstabellen, fremde Layouts und unstrukturierte Text-PDFs werden nicht mehr importiert.
 Seiten ohne erkannte Tabelle erhalten einen Hinweis. Erkannte Seiten eines mehrseitigen
 Berichts können weiterhin als Vorschläge erscheinen.
@@ -20,25 +24,50 @@ Berichts können weiterhin als Vorschläge erscheinen.
 
 | Auswahl | Wert | Einheit |
 |---|---:|---|
-| Hb | 124 | g/l |
+| Hämoglobin | 124 | g/l |
+| Hämatokrit | 0.368 | l/l |
 | Thrombozyten | 465 | G/l |
 | Leukozyten | 10.19 | G/l |
 | Kreatinin | 83 | µmol/l |
 | Kalium | 5.2 | mmol/l |
 | Natrium | 137 | mmol/l |
+| eGFR | 70 | ml/min/1.7m² |
 | CRP | 18 | mg/l |
 
-Entnahmedatum: 01.08.2026 11:30. Diese Sollwerte stehen ausschliesslich in Tests.
-Die weiteren 19 Untersuchungszeilen werden nicht vorgeschlagen, darunter Hämatokrit,
-Erythrozyten, MCV/MCH/MCHC, Differenzialblutbild, MPV und eGFR.
+Diese Sollwerte stehen ausschliesslich in Tests.
+Die weiteren 17 Untersuchungszeilen werden nicht vorgeschlagen, darunter
+Erythrozyten, MCV/MCH/MCHC, Differenzialblutbild und MPV.
 Nicht enthaltene auswählbare Untersuchungen wie Ferritin werden nicht ergänzt.
+
+## Rote (auffällige) Resultate
+
+KISIM druckt auffällige Resultate rot. In Graustufen werden sie mittelgrau, und die
+OCR verliert oder erfindet den Dezimalpunkt (HbA1c 8.9 wurde als 89 gelesen).
+Resultat-Zellen mit roter Schrift werden deshalb aus dem Farbbild zweimal neu gelesen
+(Grünkanal und Luminanz, binarisiert, nur Ziffern und < > . , ( )). Der Wert wird nur
+übernommen, wenn alle Lesungen mit Zahl übereinstimmen; sonst bleibt das Resultat leer
+und muss manuell erfasst werden. Fussnotenverweise wie «92 (1)» gehören nicht zum Wert.
+Geprüft an allen zehn roten Werten des Beispiel-PDFs und des KISIM-Screenshots.
 
 ## Zuordnung und Einheiten
 
-`mapping.py` enthält den vorhandenen Dropdown-Katalog und explizite Synonyme.
+`mapping.py` enthält den Dropdown-Katalog und explizite Synonyme. Die angezeigten
+Bezeichnungen sind die exakten KISIM-Namen (z. B. Hämoglobin, Prothrombinzeit (Quick),
+Troponin-T high sensitive). BNP, Albumin und «Quick / INR» sind Altwerte: bestehende
+Zeilen bleiben sichtbar, neu auswählen oder importieren lassen sie sich nicht.
+Gespeicherte Zeilen werden mit Schema-Version 5 umbenannt (Hb → Hämoglobin,
+Troponin T → Troponin-T high sensitive; Quick / INR nur bei eindeutiger Einheit).
+INR hat in KISIM keine Einheit und wird mit der Einheit «INR» übernommen.
 Keine Teilwortsuche und keine unscharfe Ähnlichkeitssuche: Thrombozytenvolumen
 wird beispielsweise nicht zu Thrombozyten, NT-proBNP nicht zu BNP.
 «Anderer Wert» ist manuell verfügbar, aber kein Ziel des Imports.
+
+Bei Bildern korrigiert `normalize_import_unit(..., ocr=True)` belegte OCR-Verwechslungen
+der Einheiten: «/l» als N, A, i, ! oder t gelesen, µ als u, y oder p (p nur, wenn pmol
+für den Parameter nicht zulässig ist), «mi/» statt «ml/» und ² als ?, * oder 7. Eine
+Korrektur gilt nur, wenn danach genau eine zulässige Einheit passt; bei mehreren
+Möglichkeiten (z. B. Hb g/l oder g/dl) bleibt die Einheit leer. Geprüft an allen
+Einheiten des Beispiel-PDFs und des KISIM-Screenshots ohne falsche Zuordnung.
 
 `IMPORT_UNITS` definiert zulässige Einheiten pro Parameter. Es gibt keine
 automatischen Einheitenumrechnungen. g/l und G/l bleiben unterschiedliche Einheiten.

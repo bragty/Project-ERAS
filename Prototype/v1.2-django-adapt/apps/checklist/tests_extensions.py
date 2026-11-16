@@ -183,6 +183,13 @@ class ClinicalExtensionsPersistenceTests(TestCase):
         for state in ({'opDate':'31.02.2026'}, {'referrals':{'kardio':{'date':'2026-02-30'}}}, {'answers':[]}, {'labs':{}}):
             self.assertEqual(self.client.put(self.url,data=json.dumps({'state':state}),content_type='application/json').status_code,422)
 
+    def test_lab_parameter_may_only_be_recorded_once(self):
+        hb={'type':'Hb','value':'124','unit':'g/l'}
+        response=self.client.put(self.url,data=json.dumps({'state':{'labs':[hb,{**hb,'value':'130'}]}}),content_type='application/json')
+        self.assertEqual(response.status_code,422)
+        other={'type':'Anderer Wert','value':'x','unit':'y'}
+        self.assertEqual(len(self.put({'labs':[hb,other,{**other,'value':'z'}]})['state']['labs']),3)
+
     def test_central_sex_overrides_spoofed_questionnaire_without_losing_legacy_answer(self):
         answers={f'stopbang_{key}':'0' for key in ('snoring','tired','observed','pressure','bmi','age','neck')}
         answers['stopbang_sex']='0'
@@ -212,9 +219,10 @@ class ClinicalExtensionsPersistenceTests(TestCase):
                   'checked':{'t1:diagnosen':True, 't1:kardio':True}}
         ChecklistState.objects.create(treatment_case=self.case, state=legacy, schema_version=3)
         result = self.client.get(self.url).json()
-        self.assertEqual(result['state']['schemaVersion'], 4)
+        self.assertEqual(result['state']['schemaVersion'], 5)
         self.assertEqual(result['state']['notes'], legacy['notes'])
-        self.assertEqual(result['state']['labs'], legacy['labs'])
+        # Labels are migrated to the exact KISIM names; values stay unchanged.
+        self.assertEqual(result['state']['labs'], [{'type':'Hämoglobin','value':'124','unit':'g/l'}])
         self.assertTrue(result['state']['checked']['t1:diagnosen'])
         self.assertNotIn('t1:kardio', result['state']['checked'])
         self.assertEqual(result['derived']['cardiac']['status'], 'review')
