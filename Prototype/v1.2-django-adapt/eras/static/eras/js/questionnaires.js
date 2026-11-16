@@ -29,6 +29,10 @@ function updateQuestionnaireResults(){
 document.body.addEventListener('toggle',e=>{
   const id=e.target.dataset.questionnaire;
   if(!id) return;
-  STATE.openBlocks['questionnaire:'+id]=e.target.open;
+  // Browsers also fire "toggle" for <details open> created by a re-render.
+  // Saving only real changes prevents a re-render -> save -> re-render loop.
+  const key='questionnaire:'+id;
+  if(!!STATE.openBlocks[key]===e.target.open) return;
+  STATE.openBlocks[key]=e.target.open;
   scheduleSave();
 },true);

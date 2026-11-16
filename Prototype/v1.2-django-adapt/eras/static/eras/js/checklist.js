@@ -369,8 +369,10 @@ function itemErrorsHTML(id, fields){
   const errors = ITEM_ERRORS[id];
   if (!errors) return "";
   const lines = Object.entries(errors).map(([key, message]) => {
-    const field = fields.find(f => f.key === key);
-    return `<li>${field ? `${esc(field.label)}: ` : ""}${esc(message)}</li>`;
+    // Blocking fields may belong to another item; fall back to the definition.
+    const label = fields.find(f => f.key === key)?.label || CHECKLIST_DEFINITION.fields[key]?.label
+      || (key === 'opDate' ? 'OP-Datum' : '');
+    return `<li>${label ? `${esc(label)}: ` : ""}${esc(message)}</li>`;
   });
   return `<div class="item-errors" role="alert"><strong>Angaben prüfen:</strong><ul>${lines.join("")}</ul></div>`;
 }
@@ -458,10 +460,22 @@ function attachHandlers(){
     }
     const cb = e.target.closest('input[type=checkbox]');
     if (cb && cb.dataset.id){
+      // Invalid inputs are not sent, so the server could not verify a tick
+      // that depends on them; it is refused right here (unticking stays possible).
+      const blockers = cb.checked ? blockersForItem(cb.dataset.id, unsavedInvalidFields()) : [];
+      if (blockers.length){
+        cb.checked = false;
+        ITEM_ERRORS[cb.dataset.id] = blockedTickErrors(blockers);
+        BLOCKED_TICK_IDS.add(cb.dataset.id);
+        rerenderFromState();
+        document.getElementById('saveState').textContent='Nicht gespeichert – markierte Felder prüfen';
+        return;
+      }
       // The server validates the tick on save; if fields are missing it removes
       // the tick again and returns the reasons (shown via ITEM_ERRORS).
       STATE.checked[cb.dataset.id] = cb.checked;
       delete ITEM_ERRORS[cb.dataset.id];
+      BLOCKED_TICK_IDS.delete(cb.dataset.id);
       saveNow();
       updateProgress();
       const row = cb.closest('.item');
@@ -787,12 +801,22 @@ function renderDerived(){
   if(context) context.innerHTML=`Geschlecht: ${esc({male:'Männlich',female:'Weiblich'}[DERIVED.patientSex]||'nicht erfasst – bitte nachpflegen')} · <a href="/?edit=${encodeURIComponent(currentCaseNumber())}">Stammdaten bearbeiten</a>`;
   document.querySelectorAll('[data-cardiac-result]').forEach(el=>{
     const result = DERIVED.cardiac;
-    el.classList.toggle('clinical-warning', result?.status === 'consult');
-    el.innerHTML = result ? `<strong>${esc(result.message)}</strong><p>Ausgewählte Risikofaktoren: ${esc(result.riskCount ?? 'nicht beurteilbar')}${result.riskAssessmentComplete?' (vollständig überprüft)':' (Beurteilung offen)'}</p>${[...(result.reasons||[]), ...(result.pending||[])].map(t=>`<p>${esc(t)}</p>`).join('')}<small>Fachliche Prüfung und bestehender Freigabeprozess erforderlich. Keine automatische Konsilanordnung.</small>` : 'Screening noch nicht ausgewertet.';
+    const consult = result?.status === 'consult';
+    // Like the EF/mMRC hint, only shown when a referral is required. Missing
+    // answers are reported when the item is ticked (server validation).
+    el.hidden = !consult;
+    el.classList.toggle('clinical-warning', consult);
+    // One wrapper, so the warning can sit next to its icon like the .flag-box hints.
+    el.innerHTML = !consult ? '' : `<div class="clinical-guidance-body"><strong>${esc(result.message)}</strong><p>Ausgewählte Risikofaktoren: ${esc(result.riskCount ?? 'nicht beurteilbar')}${result.riskAssessmentComplete?' (vollständig überprüft)':' (Beurteilung offen)'}</p>${[...(result.reasons||[]), ...(result.pending||[])].map(t=>`<p>${esc(t)}</p>`).join('')}<small>Fachliche Prüfung und bestehender Freigabeprozess erforderlich. Keine automatische Konsilanordnung.</small></div>`;
   });
   document.querySelectorAll('[data-bowel-result]').forEach(el=>{
     const result = DERIVED.bowel;
-    el.innerHTML = result ? `<strong>Klinisch zu prüfende Vorgabe</strong><p>${esc(result.message)}</p><p>${result.startDate ? 'Geplanter Beginn: '+esc(result.startDate) : 'OP-Datum zur Berechnung des Beginns ergänzen.'}</p>` : 'Obstipationsstatus und OP-Datum erfassen; fachliche Prüfung erforderlich.';
+    // Shown once an Obstipationsstatus is chosen; styled as information (not a
+    // warning), since it is the regular instruction.
+    const shown = !!result && !!STATE.answers.stuhl_obstipation;
+    el.hidden = !shown;
+    el.classList.toggle('clinical-info', shown);
+    el.innerHTML = !shown ? '' : `<div class="clinical-guidance-body"><strong>Klinisch zu prüfende Vorgabe</strong><p>${esc(result.message)}</p><p>${result.startDate ? 'Geplanter Beginn: '+esc(result.startDate) : 'OP-Datum zur Berechnung des Beginns ergänzen.'}</p></div>`;
   });
   document.querySelectorAll('[data-questionnaire-bmi]').forEach(el=>{
     el.textContent = DERIVED.bmi == null ? '' : `(${DERIVED.bmi.toFixed(1)} kg/m²)`;
@@ -954,13 +978,40 @@ function applyServerResult(res, base){
   const remote = serverState(res);
   DERIVED = res.derived || {};
   const refused = res.validationErrors || {};
-  ITEM_ERRORS = refused;
+  const previous = ITEM_ERRORS;
+  ITEM_ERRORS = withOpenRefusals(previous, refused, remote.checked || {});
   const changed = adoptRemoteState(base || remote, remote);
   Object.keys(ITEM_ERRORS).forEach(id => { if (STATE.checked[id]) delete ITEM_ERRORS[id]; });
+  // Item messages are part of the item markup and change only with a full re-render.
   if (!changed){
-    if (Object.keys(refused).length) rerenderFromState(); else renderDerived();
+    if (!deepEqual(previous, ITEM_ERRORS)) rerenderFromState(); else renderDerived();
   }
   return { remote, changed };
+}
+
+// Items whose tick was refused locally because an input they depend on is invalid.
+const BLOCKED_TICK_IDS = new Set();
+
+// The server reports why a tick was refused only in the response to that tick:
+// afterwards the item is unticked and later responses no longer mention it.
+// The reasons therefore stay until the user resolves them: by editing the
+// item's fields (invalidateConfirmations), ticking again, or, for locally
+// blocked ticks, correcting the invalid input.
+function withOpenRefusals(previous, next, checked){
+  const result = Object.assign({}, next);
+  const itemIds = new Set(allItemIds());
+  let blockers = null;
+  Object.entries(previous || {}).forEach(([id, errors]) => {
+    if (id in result || !itemIds.has(id) || checked[id]) return;
+    if (BLOCKED_TICK_IDS.has(id)){
+      const open = blockersForItem(id, blockers ??= unsavedInvalidFields());
+      if (!open.length){ BLOCKED_TICK_IDS.delete(id); return; }
+      result[id] = blockedTickErrors(open);
+      return;
+    }
+    result[id] = errors;
+  });
+  return result;
 }
 
 function captureUIState(){
@@ -1064,25 +1115,89 @@ function startLiveSync(){
   document.addEventListener('visibilitychange', () => { if (!document.hidden) pollRemoteState(); });
 }
 
+// Locally invalid inputs that differ from the saved state. They are never sent
+// (legacy invalid values already stored do not count). Returns [{key, message}].
+function unsavedInvalidFields(){
+  const blockers=[];
+  document.querySelectorAll('[data-fkey]').forEach(field=>{
+    const key=field.dataset.fkey;
+    const message=checklistFieldMessage(field);
+    if(message&&!deepEqual(STATE.answers[key],SYNC.base?.answers?.[key])&&!blockers.some(b=>b.key===key))
+      blockers.push({key,message});
+  });
+  const opMessage=operationDateMessage(STATE.opDate||'');
+  if(opMessage&&STATE.opDate!==SYNC.base?.opDate) blockers.push({key:'opDate',message:opMessage});
+  return blockers;
+}
+
+// Fields the server derives from an input; items using them depend on it too.
+const DERIVED_FIELD_SOURCES = {
+  vital_gewicht:['g8_bmi','stopbang_bmi'],
+  vital_groesse:['g8_bmi','stopbang_bmi'],
+  raucher_menge:['raucher_py'],
+  raucher_jahre:['raucher_py'],
+};
+
+// Only items that use an invalid field (directly or via a derived value) are
+// blocked; items in other sections can still be completed and saved.
+// The OP-Datum is not part of any item validation and blocks no tick.
+function blockersForItem(itemId, blockers){
+  return blockers.filter(({key})=>
+    [key, ...(DERIVED_FIELD_SOURCES[key]||[])].some(k=>itemIdsUsingField(k).includes(itemId)));
+}
+
+// Copy of the state to send: invalid unsaved inputs are replaced by their last
+// saved value, so everything else can still be saved and validated.
+function sendableState(blockers){
+  const sent=cloneValue(STATE);
+  const saved=SYNC.base||{};
+  blockers.forEach(({key})=>{
+    if(key==='opDate'){ sent.opDate=saved.opDate??''; return; }
+    if(saved.answers&&Object.prototype.hasOwnProperty.call(saved.answers,key)) sent.answers[key]=cloneValue(saved.answers[key]);
+    else delete sent.answers[key];
+  });
+  return sent;
+}
+
+function blockedTickErrors(blockers){
+  const errors={};
+  blockers.forEach(({key,message})=>{ errors[key]=`${message} Erst nach Korrektur abschliessbar.`; });
+  return errors;
+}
+
+// Ticks the server has not confirmed yet are taken back (e.g. after a 422),
+// so the checklist never shows completions that were not validated.
+function revertUnconfirmedTicks(){
+  const saved=SYNC.base?.checked||{};
+  Object.keys(STATE.checked).forEach(id=>{
+    if(STATE.checked[id]&&!saved[id]){
+      delete STATE.checked[id];
+      if(!ITEM_ERRORS[id]) ITEM_ERRORS[id]={_:'Nicht abgeschlossen – Speichern wurde abgelehnt, markierte Felder prüfen.'};
+    }
+  });
+}
+
 async function saveState(){
   if (SYNC.saving){ SYNC.resave = true; return; }
-  const invalid=[...document.querySelectorAll('[data-fkey]')].some(field=>
-    checklistFieldMessage(field)&&!deepEqual(STATE.answers[field.dataset.fkey],SYNC.base?.answers?.[field.dataset.fkey]));
-  if(invalid||(operationDateMessage(STATE.opDate||'')&&STATE.opDate!==SYNC.base?.opDate)){
+  const blockers = unsavedInvalidFields();
+  const partialMessage = 'Nicht gespeichert: markierte Felder prüfen (übrige Angaben gespeichert)';
+  const sent = sendableState(blockers);
+  // Nothing besides the invalid input changed: no request needed.
+  if (blockers.length && SYNC.base && deepEqual(withoutLocalOnly(sent), withoutLocalOnly(Object.assign(emptyState(), SYNC.base)))){
     renderDerived();
-    document.getElementById('saveState').textContent='Nicht gespeichert – markierte Felder prüfen';
+    document.getElementById('saveState').textContent = partialMessage;
     return;
   }
   SYNC.saving = true;
-  const sent = cloneValue(STATE);
   try{
     const res = await window.storage.set(caseStorageKey(), JSON.stringify(sent), {baseRevision: SYNC.revision ?? undefined});
     // Takes over server-side normalization (scores, invalid ticks removed)
-    // for everything not edited again while the request was running.
+    // for everything not edited again while the request was running. The
+    // withheld invalid inputs count as local edits and stay visible.
     const { remote } = applyServerResult(res, sent);
     SYNC.base = remote;
     SYNC.revision = res.revision;
-    document.getElementById('saveState').textContent = 'Automatisch gespeichert · ' + syncTime();
+    document.getElementById('saveState').textContent = blockers.length ? partialMessage : 'Automatisch gespeichert · ' + syncTime();
   }catch(err){
     if (err.status === 409){
       try{
@@ -1094,7 +1209,8 @@ async function saveState(){
         console.error('Storage error', pullErr);
       }
     }else if(err.status===422){
-      ITEM_ERRORS=err.payload?.error?.fields||{};
+      ITEM_ERRORS=withOpenRefusals(ITEM_ERRORS, err.payload?.error?.fields||{}, SYNC.base?.checked||{});
+      revertUnconfirmedTicks();
       document.getElementById('saveState').textContent='Nicht gespeichert – markierte Felder prüfen';
       rerenderFromState();
     }else{

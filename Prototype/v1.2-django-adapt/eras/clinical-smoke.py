@@ -208,13 +208,43 @@ def main():
                     expect(prostate).to_be_visible()
                     expect(page.locator('[data-fkey="stopbang_sex"]')).to_have_count(0)
                     number=page.locator('[data-fkey="vital_gewicht"]')
+                    # The reason for a refused tick only comes with that tick's
+                    # response; it must survive later saves of unrelated fields.
+                    vital_errors=page.locator('.item[data-id="t1:vitalparameter"] .item-errors')
+                    page.locator('.item-title[data-id="t1:vitalparameter"]').click()
+                    expect(vital_errors).to_contain_text('Pflichtfeld')
+                    page.locator('[data-fkey="anamnese_miktion"]').fill('QA Miktion')
+                    expect(page.locator('#saveState')).to_contain_text('Automatisch gespeichert')
+                    page.wait_for_timeout(700)
+                    expect(vital_errors).to_contain_text('Pflichtfeld')
+                    expect(page.locator('[data-field-error="vital_gewicht"]')).to_contain_text('Pflichtfeld')
                     for invalid in ('-1','abc','NaN','3000'):
                         number.fill(invalid)
                         number.blur()
                         expect(number).to_have_value(invalid)
                         expect(number).to_have_attribute('aria-invalid','true')
                         expect(page.locator('#saveState')).to_contain_text('Nicht gespeichert')
+                    # The invalid weight is never sent: items depending on it
+                    # (directly or via the BMI) must refuse the tick ...
+                    for item in ('t1:vitalparameter', 't1:fb-g8'):
+                        box=page.locator(f'input[type=checkbox][data-id="{item}"]')
+                        box.evaluate('el => el.click()')
+                        expect(box).not_to_be_checked()
+                        expect(page.locator(f'.item[data-id="{item}"] .item-errors')).to_contain_text('Gewicht (kg)')
+                    # ... while unrelated items can still be completed and saved.
+                    other=page.locator('input[type=checkbox][data-id="t2:p-uro:0"]')
+                    other.evaluate('el => el.click()')
+                    expect(page.locator('#saveState')).to_contain_text('übrige Angaben gespeichert')
+                    page.reload()
+                    expect(other).to_be_checked()
+                    expect(number).not_to_have_value('3000')  # invalid value was never stored
+                    other.evaluate('el => el.click()')
+                    expect(other).not_to_be_checked()
+                    number.fill('3000')
+                    number.blur()
                     number.fill('250.5')
+                    expect(page.locator('#saveState')).to_contain_text('Automatisch gespeichert')
+                    expect(page.locator('.item[data-id="t1:vitalparameter"] .item-errors')).to_have_count(0)
                     expect(number).to_have_attribute('aria-invalid','false')
                     page.locator('#opdate').fill('31.02.2026')
                     expect(page.locator('#opdateError')).to_contain_text('gültiges OP-Datum')
@@ -236,7 +266,9 @@ def main():
                     page.locator('[data-add-doctor]').click()
                     page.locator('[data-doctor-field="specialty"]').fill('Urologie')
                     page.locator('[data-doctor-field="name"]').fill('QA Arzt')
+                    expect(page.locator('[data-bowel-result]')).to_be_hidden()  # no status yet
                     page.locator('[data-fkey="stuhl_obstipation"]').select_option('Ja')
+                    expect(page.locator('[data-bowel-result]')).to_have_class('clinical-guidance clinical-info')
                     page.locator('[data-checkbox-key="stuhl_rezept"]').check()
                     expect(page.locator('[data-bowel-result]')).to_contain_text('2 Beutel')
                     expect(page.locator('[data-bowel-result]')).to_contain_text('2026-11-07')
@@ -265,8 +297,11 @@ def main():
                     page.locator('[data-fkey="kardio_met"]').select_option('gt4')
                     page.locator('[data-fkey="kardio_risiken_beurteilt"]').select_option('Ja')
                     risks = page.locator('[data-multi-key="kardio_risiken"]')
-                    for index in range(4):
+                    # Like the EF/mMRC hint: no box at all without a required referral.
+                    for index in range(3):
                         risks.nth(index).check()
+                    expect(page.locator('[data-cardiac-result]')).to_be_hidden()
+                    risks.nth(3).check()
                     expect(page.locator('[data-cardiac-result]')).to_contain_text('Kardiologische Zuweisung erforderlich')
                     expect(page.locator('[data-cardiac-result]')).to_contain_text('4 (vollständig überprüft)')
                     referral = page.locator('[data-referral-id="kardio"] textarea').input_value()
