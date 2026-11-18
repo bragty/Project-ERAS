@@ -177,6 +177,76 @@ def bowel_guidance(answers, op_date):
     }
 
 
+# ----------------------------------------------------------------------------
+# HbA1c (Vorgabe HbA1c_Logik): measure depends on the diabetes status from the
+# anamnesis. Thresholds are in %; other units are not converted.
+
+HBA1C_LABEL = "HbA1c"
+HBA1C_MEASURES = {
+    # (group, category): (status, message)
+    ("Nein", "normal"): ("ok", "HbA1c < 5.7 %: Keine Massnahmen."),
+    ("Nein", "prediabetes"): ("action", "HbA1c 5.7–6.4 %: Vermerk im Austrittsbericht mit Bitte um Nachkontrolle "
+                                        "bei Vd. a. Prädiabetes."),
+    ("Nein", "therapy"): ("action", "HbA1c > 6.4 %: Kontakt Hausarzt für Beginn antidiabetische Therapie (ggf. "
+                                    "Rücksprache mit Diabetesberatung, falls der Hausarzt dies nicht machen kann)."),
+    ("Ja", "normal"): ("ok", "HbA1c < 8 %: Keine Massnahmen."),
+    # The Vorgabe names "<8 %" and ">8 %"; exactly 8.0 is treated as the higher group.
+    ("Ja", "high"): ("action", "HbA1c ≥ 8 %: Kontakt Hausarzt bezüglich Optimierung der antidiabetischen Therapie."),
+}
+HBA1C_HIGH_NOTE = "HbA1c > 10 %: ggf. Diabetesberatung einschalten in Rücksprache mit dem Hausarzt."
+HBA1C_GROUPS = {"Ja": "Diabetiker/in", "Nein": "Nicht-Diabetiker/in"}
+
+
+def _hba1c_category(diabetic, value):
+    if diabetic == "Ja":
+        return "normal" if value < 8 else "high"
+    return "normal" if value < 5.7 else "prediabetes" if value <= 6.4 else "therapy"
+
+
+def assess_hba1c(diabetes, value, unit):
+    """Measure for one HbA1c value. ``value`` may carry < or > (e.g. "<5.0")."""
+    from .lab_import.parser import normalize_numeric
+    operator, number = normalize_numeric(value)
+    shown = f"{str(value or '').strip()} {str(unit or '').strip()}".strip()
+    result = {"status": "review", "value": shown, "group": HBA1C_GROUPS.get(diabetes), "message": "", "note": ""}
+    if number is None:
+        result["message"] = "HbA1c-Wert ist keine Zahl; bitte prüfen."
+        return result
+    if str(unit or "").strip() != "%":
+        result["message"] = "Beurteilung ist nur für HbA1c in % hinterlegt; bitte manuell beurteilen."
+        return result
+    if diabetes not in HBA1C_GROUPS:
+        result["message"] = "Diabetes-Status in der Anamnese erfassen (Ja/Nein), damit HbA1c beurteilt werden kann."
+        return result
+    number = float(number)
+    category = _hba1c_category(diabetes, number)
+    # A bound ("<5.0", ">12") is used only if every value it allows has the same measure.
+    if operator in ("<", "<="):
+        lowest = _hba1c_category(diabetes, float("-inf"))
+        exact_ok = _hba1c_category(diabetes, number - 1e-9) == lowest if operator == "<" else category == lowest
+        category = lowest if exact_ok else None
+    elif operator in (">", ">="):
+        highest = _hba1c_category(diabetes, float("inf"))
+        exact_ok = _hba1c_category(diabetes, number + 1e-9) == highest if operator == ">" else category == highest
+        category = highest if exact_ok else None
+    if category is None:
+        result["message"] = "Wert mit Vergleichszeichen lässt sich keiner Massnahme eindeutig zuordnen; bitte manuell beurteilen."
+        return result
+    result["status"], result["message"] = HBA1C_MEASURES[(diabetes, category)]
+    if number > 10 or (operator in (">", ">=") and number >= 10):
+        result["note"] = HBA1C_HIGH_NOTE
+    return result
+
+
+def hba1c_assessment(answers, labs):
+    """Assessment of the recorded HbA1c, or status "none" without a value."""
+    row = next((r for r in labs or [] if isinstance(r, dict) and r.get("type") == HBA1C_LABEL
+                and str(r.get("value") or "").strip()), None)
+    if not row:
+        return {"status": "none"}
+    return assess_hba1c(answers.get("anamnese_diabetes"), row.get("value"), row.get("unit"))
+
+
 def _tropo(a):
     pre, day1, day2 = (as_number(a.get(key)) for key in ("tropo_preop", "tropo_tag1", "tropo_tag2"))
     if pre is not None:

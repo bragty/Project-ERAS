@@ -405,6 +405,25 @@ def _patient_match(identity, treatment_case):
     return {"status": "match", "message": "Erkannte eindeutige Kennung stimmt mit dem geöffneten Fall überein."}
 
 
+def _assess_hba1c_suggestions(suggestions, treatment_case):
+    """Show the HbA1c measure already in the preview (same rule as after saving).
+
+    ``assessedFor`` lets the preview hide the hint once the value is edited.
+    """
+    from apps.checklist.rules import assess_hba1c
+    from apps.responses.services import get_state
+    hba1c = [s for s in suggestions if s.get("labId") == "hba1c"]
+    if not hba1c:
+        return
+    _obj, state, _summary, _derived, _errors = get_state(treatment_case)
+    diabetes = (state.get("answers") or {}).get("anamnese_diabetes")
+    for suggestion in hba1c:
+        value = f"{suggestion.get('comparisonOperator') or ''}{suggestion.get('normalizedValue') or ''}"
+        assessment = assess_hba1c(diabetes, value, suggestion.get("normalizedUnit"))
+        assessment["assessedFor"] = f"{value}|{suggestion.get('normalizedUnit') or ''}"
+        suggestion["assessment"] = assessment
+
+
 def process_lab_upload(upload, treatment_case):
     data, kind = _validate_upload(upload)
     digest = hashlib.sha256(data).hexdigest()
@@ -419,6 +438,7 @@ def process_lab_upload(upload, treatment_case):
     # the current checklist, so later manual edits are taken into account.
     for suggestion in suggestions:
         suggestion["sourceHash"] = digest
+    _assess_hba1c_suggestions(suggestions, treatment_case)
 
     if not suggestions:
         warnings.append("Keine unterstützten Laborwerte konnten sicher erkannt werden. Bericht bitte manuell erfassen oder Layout-Konfiguration ergänzen.")

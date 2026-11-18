@@ -88,6 +88,19 @@ test('values compare by content: "124,0 g/L" equals 124 g/l, a changed value sta
   run('applyLabImport()');
   assert.equal(run('STATE.labs[0].value'),'124');assert.equal(run('confirmations'),1);
 });
+test('HbA1c preview shows the server measure only for the value it was computed for',()=>{
+  const run=app();
+  run(`LAB_IMPORT_PREVIEW.suggestions=[{labId:'hba1c',labLabel:'HbA1c',originalLabel:'HbAlc',normalizedValue:'8.9',normalizedUnit:'%',
+    comparisonOperator:'',status:'review',sourceHash:'x',templateId:'kisim-single-result-v1',
+    assessment:{status:'action',value:'8.9 %',group:'Nicht-Diabetiker/in',message:'HbA1c > 6.4 %: Kontakt Hausarzt',note:'',assessedFor:'8.9|%'}}]`);
+  let html=run('labImportPreviewHTML()');
+  assert.match(html,/HbA1c 8.9 % – Nicht-Diabetiker\/in/);
+  assert.match(html,/clinical-warning/);
+  run("LAB_IMPORT_PREVIEW.suggestions[0].normalizedValue='5.2'");
+  html=run('labImportPreviewHTML()');
+  assert.doesNotMatch(html,/Kontakt Hausarzt/);
+  assert.match(html,/HbA1c-Beurteilung erscheint nach der Übernahme/);
+});
 test('confirmed replacement overwrites the existing value and stores no measurement time',()=>{
   const run=app();run("STATE.labs=[{type:'Hämoglobin',value:'100',unit:'g/l'}];applyLabImport()");
   assert.equal(run('confirmations'),1);

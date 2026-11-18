@@ -167,3 +167,25 @@ Ein Originalbericht ist eine erfolgreiche Regression, kein Nachweis allgemeiner
 OCR-Genauigkeit. Abweichende Scannerqualität und OCR-Versionen können Ergebnisse
 verändern; deshalb bleiben die Sichtkontrolle und bewusste Auswahl erforderlich.
 Der Prototyp enthält kein Login-/Berechtigungssystem.
+
+## HbA1c-Beurteilung
+
+Vorgabe: `Projektunterlagen/Grundlagen/Laborimport_Beispiel/HbA1c_Logik.png`.
+Die Anamnese-Frage «Diabetes mellitus» (Ja/Nein/Unbekannt, Abschnitt «Allergien, Risiken
+und klinischer Status») bestimmt die Gruppe. Die Regel steht ausschliesslich in
+`rules.py` (`assess_hba1c`) und gilt für manuell erfasste und importierte Werte:
+
+| Gruppe | HbA1c | Massnahme |
+|---|---|---|
+| Nicht-Diabetiker/in | < 5.7 % | Keine Massnahmen |
+| Nicht-Diabetiker/in | 5.7–6.4 % | Vermerk im Austrittsbericht, Nachkontrolle bei Vd. a. Prädiabetes |
+| Nicht-Diabetiker/in | > 6.4 % | Kontakt Hausarzt für Beginn antidiabetische Therapie |
+| Diabetiker/in | < 8 % | Keine Massnahmen |
+| Diabetiker/in | ≥ 8 % | Kontakt Hausarzt bzgl. Optimierung der antidiabetischen Therapie |
+| beide | > 10 % | zusätzlich: ggf. Diabetesberatung in Rücksprache mit dem Hausarzt |
+
+Die Vorgabe nennt «<8 %» und «>8 %»; genau 8.0 % wird der höheren Gruppe zugeordnet.
+Ohne Diabetes-Status, bei anderer Einheit als % oder bei einem Vergleichswert, der keiner
+Gruppe eindeutig zugeordnet werden kann (z. B. «>6.0»), erscheint ein Prüfhinweis statt
+einer Massnahme. Der Hinweis erscheint unter den Laborwerten und bereits in der
+Importvorschau; wird der Wert dort geändert, folgt die Beurteilung nach der Übernahme.

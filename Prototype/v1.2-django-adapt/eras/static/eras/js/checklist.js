@@ -185,6 +185,17 @@ function labUnitKey(unit){
 function existingLabRow(label){
   return (STATE.labs||[]).find(row=>row.type===label && String(row.value||'').trim());
 }
+// HbA1c measure computed by the server for the value as recognized. Once the
+// value or unit is edited in the preview, the hint follows after saving instead.
+function hba1cPreviewHTML(item){
+  const result = item.assessment;
+  if(!result) return '';
+  if(result.assessedFor !== `${item.comparisonOperator||''}${item.normalizedValue||''}|${item.normalizedUnit||''}`){
+    return '<div class="clinical-guidance clinical-info"><div class="clinical-guidance-body"><p>HbA1c-Beurteilung erscheint nach der Übernahme.</p></div></div>';
+  }
+  return `<div class="clinical-guidance ${result.status==='ok'?'clinical-info':'clinical-warning'}">${hba1cGuidanceHTML(result)}</div>`;
+}
+
 // A suggestion equal to the recorded value needs no decision and is only listed.
 function labImportIdentical(item){
   const row = existingLabRow(item.labLabel);
@@ -192,6 +203,11 @@ function labImportIdentical(item){
   const recorded = labValueKey(row.value);
   return recorded!==null && recorded===labValueKey(`${item.comparisonOperator||''}${item.normalizedValue||''}`)
     && labUnitKey(row.unit)===labUnitKey(item.normalizedUnit);
+}
+
+function hba1cGuidanceHTML(result){
+  const title = `HbA1c ${result.value}${result.group ? ' – '+result.group : ''}`;
+  return `<div class="clinical-guidance-body"><strong>${esc(title)}</strong><p>${esc(result.message)}</p>${result.note?`<p>${esc(result.note)}</p>`:''}<small>Klinische Entscheidungshilfe gemäss Vorgabe HbA1c; fachliche Prüfung erforderlich.</small></div>`;
 }
 
 function labImportPreviewHTML(){
@@ -231,6 +247,7 @@ function labImportPreviewHTML(){
             <label><span>Einheit</span><input type="text" data-lab-preview-index="${sourceIndex}" data-lab-preview-field="normalizedUnit" value="${esc(item.normalizedUnit||'')}"><small>Original: ${esc(item.originalUnit||'')}</small></label>
           </div>
           ${conflict}
+          <div data-hba1c-preview="${sourceIndex}">${hba1cPreviewHTML(item)}</div>
           ${warnings ? `<ul class="lab-import-warnings">${warnings}</ul>` : ''}
           <details class="lab-import-source"><summary>Fundstelle anzeigen</summary><code>${esc(item.sourceExcerpt||'Keine Fundstelle verfügbar')}</code></details>
         </article>`;
@@ -369,7 +386,7 @@ function suchtRowsHTML(){
 function customHTML(kind){
   if (kind === 'cardiac') return '<div class="clinical-guidance" data-cardiac-result aria-live="polite"></div>';
   if (kind === 'bowel') return '<div class="clinical-guidance" data-bowel-result aria-live="polite"></div>';
-  if (kind === "labs") return labRowsHTML();
+  if (kind === "labs") return labRowsHTML() + '<div class="clinical-guidance" data-hba1c-result aria-live="polite" hidden></div>';
   if (kind === "suchtmittel") return suchtRowsHTML();
   return "";
 }
@@ -689,6 +706,8 @@ function attachHandlers(){
       if(item){
         item[previewField.dataset.labPreviewField] = previewField.value;
         if(previewField.dataset.labPreviewField==='labLabel') item.labId = LAB_ID_BY_LABEL[previewField.value] || 'other';
+        const hint = document.querySelector(`[data-hba1c-preview="${previewField.dataset.labPreviewIndex}"]`);
+        if(hint) hint.innerHTML = hba1cPreviewHTML(item);
       }
       return;
     }
@@ -858,6 +877,15 @@ function renderDerived(){
     el.hidden = !shown;
     el.classList.toggle('clinical-info', shown);
     el.innerHTML = !shown ? '' : `<div class="clinical-guidance-body"><strong>Klinisch zu prüfende Vorgabe</strong><p>${esc(result.message)}</p><p>${result.startDate ? 'Geplanter Beginn: '+esc(result.startDate) : 'OP-Datum zur Berechnung des Beginns ergänzen.'}</p></div>`;
+  });
+  document.querySelectorAll('[data-hba1c-result]').forEach(el=>{
+    // HbA1c measure from rules.py, shown as soon as an HbA1c value is recorded.
+    const result = DERIVED.hba1c;
+    const shown = !!result && result.status !== 'none';
+    el.hidden = !shown;
+    el.classList.toggle('clinical-info', shown && result.status === 'ok');
+    el.classList.toggle('clinical-warning', shown && result.status !== 'ok');
+    el.innerHTML = !shown ? '' : hba1cGuidanceHTML(result);
   });
   document.querySelectorAll('[data-questionnaire-bmi]').forEach(el=>{
     el.textContent = DERIVED.bmi == null ? '' : `(${DERIVED.bmi.toFixed(1)} kg/m²)`;

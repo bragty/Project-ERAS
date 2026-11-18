@@ -155,3 +155,65 @@ class EngineRuleTests(TestCase):
             "answers": {"stoma_termin": "2026-11-01"},
         })
         self.assertEqual(self.client.get(self.url).json()["state"]["checked"], {})
+
+
+class HbA1cRuleTests(SimpleTestCase):
+    """Vorgabe HbA1c_Logik: measure by diabetes status, thresholds in %."""
+
+    def status(self, diabetes, value, unit="%"):
+        from .rules import assess_hba1c
+        result = assess_hba1c(diabetes, value, unit)
+        return result["status"], result["message"].split(":")[0], bool(result["note"])
+
+    def test_non_diabetic_thresholds_including_boundaries(self):
+        self.assertEqual(self.status("Nein", "5.6"), ("ok", "HbA1c < 5.7 %", False))
+        self.assertEqual(self.status("Nein", "5.7"), ("action", "HbA1c 5.7–6.4 %", False))
+        self.assertEqual(self.status("Nein", "6.4"), ("action", "HbA1c 5.7–6.4 %", False))
+        self.assertEqual(self.status("Nein", "6.5"), ("action", "HbA1c > 6.4 %", False))
+        self.assertEqual(self.status("Nein", "8.9"), ("action", "HbA1c > 6.4 %", False))
+
+    def test_diabetic_thresholds_and_high_value_note(self):
+        self.assertEqual(self.status("Ja", "7.9"), ("ok", "HbA1c < 8 %", False))
+        self.assertEqual(self.status("Ja", "8.0"), ("action", "HbA1c ≥ 8 %", False))
+        self.assertEqual(self.status("Ja", "10"), ("action", "HbA1c ≥ 8 %", False))
+        self.assertEqual(self.status("Ja", "10.1"), ("action", "HbA1c ≥ 8 %", True))
+        self.assertEqual(self.status("Nein", "11,2"), ("action", "HbA1c > 6.4 %", True))
+
+    def test_missing_status_other_units_and_ambiguous_bounds_need_review(self):
+        for diabetes in (None, "", "Unbekannt"):
+            self.assertEqual(self.status(diabetes, "8.9")[0], "review")
+        self.assertEqual(self.status("Nein", "74", "mmol/mol")[0], "review")
+        self.assertEqual(self.status("Nein", "<5.0")[0:2], ("ok", "HbA1c < 5.7 %"))
+        self.assertEqual(self.status("Nein", "<5.7")[0:2], ("ok", "HbA1c < 5.7 %"))
+        self.assertEqual(self.status("Nein", "<=5.7")[0], "review")
+        self.assertEqual(self.status("Nein", ">6.0")[0], "review")
+        self.assertEqual(self.status("Nein", ">6.4")[0:2], ("action", "HbA1c > 6.4 %"))
+        self.assertEqual(self.status("Ja", ">12"), ("action", "HbA1c ≥ 8 %", True))
+
+
+class HbA1cEngineTests(TestCase):
+    setUp = EngineRuleTests.setUp
+    put = EngineRuleTests.put
+
+    def test_measure_follows_value_and_diabetes_status_after_saving(self):
+        labs = [{"type": "HbA1c", "value": "8.9", "unit": "%"}]
+        self.assertEqual(self.put({"labs": labs})["derived"]["hba1c"]["status"], "review")
+        result = self.put({"labs": labs, "answers": {"anamnese_diabetes": "Nein"}})["derived"]["hba1c"]
+        self.assertEqual((result["status"], result["group"]), ("action", "Nicht-Diabetiker/in"))
+        self.assertIn("antidiabetische Therapie", result["message"])
+        result = self.put({"labs": labs, "answers": {"anamnese_diabetes": "Ja"}})["derived"]["hba1c"]
+        self.assertEqual((result["status"], result["group"]), ("action", "Diabetiker/in"))
+        self.assertIn("Optimierung", result["message"])
+        labs = [{"type": "HbA1c", "value": "7.5", "unit": "%"}]
+        result = self.put({"labs": labs, "answers": {"anamnese_diabetes": "Ja"}})["derived"]["hba1c"]
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(self.put({"labs": []})["derived"]["hba1c"], {"status": "none"})
+
+    def test_import_preview_uses_the_recorded_diabetes_status(self):
+        from .lab_import.service import _assess_hba1c_suggestions
+        self.put({"answers": {"anamnese_diabetes": "Ja"}})
+        suggestion = {"labId": "hba1c", "normalizedValue": "8.9", "comparisonOperator": "", "normalizedUnit": "%"}
+        _assess_hba1c_suggestions([suggestion, {"labId": "hb"}], self.case)
+        self.assertEqual(suggestion["assessment"]["status"], "action")
+        self.assertIn("Optimierung", suggestion["assessment"]["message"])
+        self.assertEqual(suggestion["assessment"]["assessedFor"], "8.9|%")

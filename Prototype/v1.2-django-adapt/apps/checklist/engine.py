@@ -6,7 +6,7 @@ from decimal import Decimal, InvalidOperation
 
 from .lab_import.mapping import CATALOG_BY_LABEL, migrate_lab_rows
 from .lab_import.parser import normalize_numeric
-from .rules import FLAG_RULES, active_flags, as_number, field_required, referrals, cardiac_assessment, bowel_guidance
+from .rules import FLAG_RULES, active_flags, as_number, field_required, referrals, cardiac_assessment, bowel_guidance, hba1c_assessment
 from .schema import (
     ALL_ITEM_IDS,
     CURRENT_SCHEMA_VERSION,
@@ -384,6 +384,7 @@ def evaluate_state(raw_state, treatment_case):
         "patientSex": treatment_case.patient.sex,
         "cardiac": cardiac_assessment(answers),
         "bowel": bowel_guidance(answers, base["opDate"]),
+        "hba1c": hba1c_assessment(answers, base["labs"]),
         "bmi": round(float(bmi), 1) if bmi is not None else None,
         "flags": flags,
         "flagMessages": {name: FLAG_RULES[name].message for name, active in flags.items() if active},
